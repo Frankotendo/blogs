@@ -216,7 +216,7 @@ interface AppSettings {
   adSenseSlotId?: string;
   adSenseLayoutKey?: string;
   adSenseStatus?: 'active' | 'inactive';
-  aiName?: string;
+  aiName?: string; // Added Configurable AI Name
 }
 
 // --- UTILS ---
@@ -427,7 +427,7 @@ const GlobalVoiceOrb = ({
     let tools: FunctionDeclaration[] = [];
     let systemInstruction = "";
 
-    const aiName = contextData.settings.aiName || "Kofi";
+    const aiName = contextData.settings.aiName || "Kofi"; // Use Configured Name
 
     const ghanaianPersona = `
       You are "${aiName}", the NexRyde Polyglot Assistant.
@@ -4101,4 +4101,5 @@ if (rootElement) {
   const root = ReactDOM.createRoot(rootElement);
   root.render(<App />);
 }
+
 
