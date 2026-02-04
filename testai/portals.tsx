@@ -4,6 +4,39 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { ai, supabase, decode, decodeAudioData, compressImage, AppSettings, RideNode, Driver, HubMission, TopupRequest, RegistrationRequest, RefundRequest, Transaction } from './lib';
 import { QrScannerModal, InlineAd, AdGate } from './components';
 
+// Helper for Admin Portal Settings
+const SettingInput = ({ label, value, onChange, type = "text", placeholder = "" }: any) => (
+    <div className="space-y-1">
+        <label className="text-[9px] text-slate-500 uppercase font-bold pl-2">{label}</label>
+        <input 
+            type={type} 
+            value={value || ''} 
+            onChange={onChange} 
+            placeholder={placeholder}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs outline-none focus:border-rose-500 transition-colors" 
+        />
+    </div>
+);
+
+export const AdminLogin = ({ onLogin }: any) => {
+  const [email, setEmail] = useState('');
+  const [pass, setPass] = useState('');
+  return (
+    <div className="max-w-sm mx-auto glass p-6 rounded-[2.5rem] border border-white/10 text-center space-y-6 animate-in zoom-in">
+       <div className="w-14 h-14 bg-rose-600 rounded-2xl mx-auto flex items-center justify-center text-white shadow-xl shadow-rose-900/20">
+          <i className="fas fa-shield-halved text-2xl"></i>
+       </div>
+       <div>
+          <h2 className="text-xl font-black italic uppercase text-white">Restricted Access</h2>
+          <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mt-1">Admin Credentials Required</p>
+       </div>
+       <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Admin Email" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold outline-none text-xs focus:border-rose-500" />
+       <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Password" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold outline-none text-xs focus:border-rose-500" />
+       <button onClick={() => onLogin(email, pass)} className="w-full py-4 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl">Authenticate</button>
+    </div>
+  );
+};
+
 export const HubGateway = ({ 
   onIdentify, 
   settings, 
@@ -104,7 +137,7 @@ export const PassengerPortal = ({
   settings, 
   onShowQr, 
   onShowAbout,
-  createMode,
+  createMode, 
   setCreateMode,
   newNode,
   setNewNode,
@@ -447,25 +480,6 @@ export const PassengerPortal = ({
             </div>
          </div>
        )}
-    </div>
-  );
-};
-
-export const AdminLogin = ({ onLogin }: any) => {
-  const [email, setEmail] = useState('');
-  const [pass, setPass] = useState('');
-  return (
-    <div className="max-w-sm mx-auto glass p-6 rounded-[2.5rem] border border-white/10 text-center space-y-6 animate-in zoom-in">
-       <div className="w-14 h-14 bg-rose-600 rounded-2xl mx-auto flex items-center justify-center text-white shadow-xl shadow-rose-900/20">
-          <i className="fas fa-shield-halved text-2xl"></i>
-       </div>
-       <div>
-          <h2 className="text-xl font-black italic uppercase text-white">Restricted Access</h2>
-          <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mt-1">Admin Credentials Required</p>
-       </div>
-       <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Admin Email" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold outline-none text-xs focus:border-rose-500" />
-       <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Password" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold outline-none text-xs focus:border-rose-500" />
-       <button onClick={() => onLogin(email, pass)} className="w-full py-4 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl">Authenticate</button>
     </div>
   );
 };
@@ -1041,28 +1055,87 @@ export const AdminPortal = ({
   const [newDriver, setNewDriver] = useState<any>({ name: '', vehicleType: 'Pragia', licensePlate: '', contact: '', pin: '1234' });
   const [newMission, setNewMission] = useState<HubMission>({ id: '', location: '', description: '', entryFee: 2, driversJoined: [], status: 'open', createdAt: '' });
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
+  const [marketingPrompt, setMarketingPrompt] = useState('');
+  const [generatedContent, setGeneratedContent] = useState<{type: 'text'|'image'|'video', data: string} | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  // Sync settings when props update
   useEffect(() => { setLocalSettings(settings); }, [settings]);
 
-  // Helper component for cleaner settings form
-  const SettingInput = ({ label, value, onChange, type = "text", placeholder = "" }: any) => (
-    <div className="space-y-1">
-        <label className="text-[9px] text-slate-500 uppercase font-bold pl-2">{label}</label>
-        <input 
-            type={type} 
-            value={value || ''} 
-            onChange={onChange} 
-            placeholder={placeholder}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs outline-none focus:border-rose-500 transition-colors" 
-        />
-    </div>
-  );
+  const generateMarketingCopy = async () => {
+    if (!marketingPrompt) return;
+    setIsGenerating(true);
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: `Write a catchy, short social media post for NexRyde about: ${marketingPrompt}. Include emojis and hashtags relevant to Ghana/Students.`,
+        });
+        setGeneratedContent({ type: 'text', data: response.text || '' });
+    } catch(e: any) { alert("AI Error: " + e.message); }
+    setIsGenerating(false);
+  };
+
+  const generateMarketingImage = async () => {
+    if (!marketingPrompt) return;
+    setIsGenerating(true);
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image', 
+            contents: { parts: [{ text: `A vibrant, professional advertisement poster for a ride-sharing app in Ghana. Theme: ${marketingPrompt}` }] }
+        });
+        let imgData = null;
+        if(response.candidates?.[0]?.content?.parts) {
+            for(const part of response.candidates[0].content.parts) {
+                if(part.inlineData) imgData = part.inlineData.data;
+            }
+        }
+        if (imgData) {
+            setGeneratedContent({ type: 'image', data: imgData });
+        } else {
+            alert("No image generated. The model might have returned text instead.");
+        }
+    } catch(e: any) { alert("AI Error: " + e.message); }
+    setIsGenerating(false);
+  };
+
+  const generateMarketingVideo = async () => {
+    if (!marketingPrompt) return;
+    if ((window as any).aistudio?.openSelectKey) {
+        if (!(await (window as any).aistudio.hasSelectedApiKey())) {
+            await (window as any).aistudio.openSelectKey();
+        }
+    }
+
+    setIsGenerating(true);
+    try {
+        let operation = await ai.models.generateVideos({
+          model: 'veo-3.1-fast-generate-preview',
+          prompt: `Cinematic ad for NexRyde app. ${marketingPrompt}. Ghana campus setting. High quality, vibrant colors.`,
+          config: {
+            numberOfVideos: 1,
+            resolution: '720p',
+            aspectRatio: '16:9'
+          }
+        });
+        
+        while (!operation.done) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          operation = await ai.operations.getVideosOperation({operation: operation});
+        }
+
+        const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+        if (videoUri) {
+            setGeneratedContent({ type: 'video', data: `${videoUri}&key=${process.env.API_KEY}` }); 
+        } else {
+            alert("Video generation completed but no URI returned.");
+        }
+    } catch(e: any) { console.error(e); alert("Video Gen Error: " + e.message); }
+    setIsGenerating(false);
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in pb-20">
         <div className="flex flex-wrap gap-2 mb-6 bg-white/5 p-2 rounded-[1.5rem] border border-white/5">
-            {['monitor', 'drivers', 'rides', 'finance', 'missions', 'config'].map(tab => (
+            {['monitor', 'drivers', 'rides', 'finance', 'missions', 'marketing', 'config'].map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>
                     {tab}
                 </button>
@@ -1230,6 +1303,75 @@ export const AdminPortal = ({
                         </div>
                     ))}
                 </div>
+            </div>
+        )}
+
+        {activeTab === 'marketing' && (
+            <div className="glass p-6 rounded-[2rem] border border-white/10 space-y-8 animate-in slide-in-from-bottom-4">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h3 className="text-2xl font-black italic uppercase text-white">AI Marketing Studio</h3>
+                        <p className="text-[10px] font-black text-purple-400 uppercase tracking-widest mt-1">Generate Campaigns with Gemini & Veo</p>
+                    </div>
+                    {isGenerating && <div className="text-xs font-bold text-purple-400 animate-pulse">Generating Creative...</div>}
+                </div>
+
+                <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5">
+                    <label className="text-[9px] font-black text-slate-500 uppercase mb-2 block pl-2">Campaign Theme / Prompt</label>
+                    <textarea 
+                        value={marketingPrompt}
+                        onChange={(e) => setMarketingPrompt(e.target.value)}
+                        placeholder="e.g., 'Student Rush Hour Discount', 'Rainy Day Safety', 'Weekend Beach Trips'"
+                        className="w-full h-24 bg-black/20 border border-white/10 rounded-2xl p-4 text-white font-bold text-xs outline-none focus:border-purple-500 transition-colors resize-none"
+                    />
+                    <div className="flex gap-3 mt-4">
+                        <button onClick={generateMarketingCopy} disabled={!marketingPrompt || isGenerating} className="flex-1 py-3 bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded-xl font-black text-[9px] uppercase hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-50">
+                            <i className="fas fa-pen-nib mr-2"></i> Write Copy
+                        </button>
+                        <button onClick={generateMarketingImage} disabled={!marketingPrompt || isGenerating} className="flex-1 py-3 bg-pink-600/20 text-pink-400 border border-pink-500/30 rounded-xl font-black text-[9px] uppercase hover:bg-pink-600 hover:text-white transition-all disabled:opacity-50">
+                            <i className="fas fa-image mr-2"></i> Design Poster
+                        </button>
+                        <button onClick={generateMarketingVideo} disabled={!marketingPrompt || isGenerating} className="flex-1 py-3 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-xl font-black text-[9px] uppercase hover:bg-purple-600 hover:text-white transition-all disabled:opacity-50">
+                            <i className="fas fa-video mr-2"></i> Create Reel (Veo)
+                        </button>
+                    </div>
+                </div>
+
+                {generatedContent && (
+                    <div className="animate-in zoom-in duration-300">
+                        <div className="flex justify-between items-center mb-2 px-2">
+                            <h4 className="text-xs font-black uppercase text-white">Generated Result</h4>
+                            <button onClick={() => setGeneratedContent(null)} className="text-[9px] font-bold text-rose-500 uppercase hover:text-white">Clear</button>
+                        </div>
+                        <div className="bg-black/30 p-6 rounded-[2rem] border border-white/10 relative overflow-hidden group">
+                            {generatedContent.type === 'text' && (
+                                <div className="text-sm font-medium text-slate-200 whitespace-pre-wrap leading-relaxed">
+                                    {generatedContent.data}
+                                    <button onClick={() => navigator.clipboard.writeText(generatedContent.data)} className="absolute top-4 right-4 w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white hover:text-black transition-all">
+                                        <i className="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                            )}
+                            {generatedContent.type === 'image' && (
+                                <div className="relative">
+                                    <img src={`data:image/png;base64,${generatedContent.data}`} className="w-full rounded-2xl shadow-2xl" alt="Generated Ad" />
+                                    <a href={`data:image/png;base64,${generatedContent.data}`} download="nexryde_ad.png" className="absolute top-4 right-4 px-4 py-2 bg-black/50 backdrop-blur-md rounded-xl text-white text-[9px] font-black uppercase hover:bg-white hover:text-black transition-all">
+                                        <i className="fas fa-download mr-2"></i> Save
+                                    </a>
+                                </div>
+                            )}
+                            {generatedContent.type === 'video' && (
+                                <div className="relative aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl">
+                                    <video controls autoPlay loop className="w-full h-full object-cover">
+                                        <source src={generatedContent.data} type="video/mp4" />
+                                        Your browser does not support video.
+                                    </video>
+                                    <div className="absolute top-4 right-4 px-3 py-1 bg-purple-600 rounded-lg text-[8px] font-black uppercase text-white">Veo Generated</div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         )}
 
