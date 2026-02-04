@@ -1106,11 +1106,11 @@ const PassengerPortal = ({
             </div>
             
             <div className="relative">
-              <input value={newNode.origin} onChange={e => setNewNode({...newNode, origin: e.target.value})} placeholder="Pickup Location" className="w-full h-12 bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-white font-bold outline-none text-sm focus:border-indigo-500" />
+              <input value={newNode.origin} onChange={e => setNewNode({...newNode, origin: e.target.value})} placeholder="Pickup Location" className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-white font-bold outline-none text-sm focus:border-indigo-500" />
               <button onClick={onTriggerVoice} className="absolute right-2 top-2 w-8 h-8 flex items-center justify-center text-indigo-400 hover:text-white"><i className="fas fa-microphone"></i></button>
             </div>
             <div className="relative">
-              <input value={newNode.destination} onChange={e => setNewNode({...newNode, destination: e.target.value})} placeholder="Dropoff Location" className="w-full h-12 bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-white font-bold outline-none text-sm focus:border-indigo-500" />
+              <input value={newNode.destination} onChange={e => setNewNode({...newNode, destination: e.target.value})} placeholder="Dropoff Location" className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-white font-bold outline-none text-sm focus:border-indigo-500" />
               <button onClick={onTriggerVoice} className="absolute right-2 top-2 w-8 h-8 flex items-center justify-center text-indigo-400 hover:text-white"><i className="fas fa-microphone"></i></button>
             </div>
             
@@ -1122,19 +1122,19 @@ const PassengerPortal = ({
                ))}
             </div>
 
-            <div className="p-4 bg-indigo-900/30 rounded-2xl border border-indigo-500/20 space-y-3">
-               <div className="flex justify-between items-center px-1">
+            <div className="p-6 bg-indigo-900/30 rounded-2xl border border-indigo-500/20 space-y-3">
+               <div className="flex justify-between items-center">
                    <span className="text-[10px] font-black uppercase text-indigo-300">Base Fare</span>
-                   <span className="text-xs font-bold text-slate-400">₵{fareEstimate.toFixed(2)}</span>
+                   <span className="text-sm font-bold text-slate-400">₵{fareEstimate.toFixed(2)}</span>
                </div>
                <div>
-                   <div className="flex justify-between items-center mb-2 px-1">
+                   <div className="flex justify-between items-center mb-1">
                       <label className="text-[10px] font-black uppercase text-white">Your Offer (₵)</label>
                       <span className="text-[9px] text-emerald-400 font-bold uppercase">Boost to attract drivers</span>
                    </div>
-                   <div className="flex items-center gap-2">
-                      <button onClick={() => adjustOffer(-0.5)} className="w-11 h-11 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all">
-                          <i className="fas fa-minus text-xs"></i>
+                   <div className="flex items-center gap-3">
+                      <button onClick={() => adjustOffer(-0.5)} className="w-12 h-12 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all">
+                          <i className="fas fa-minus"></i>
                       </button>
                       <input 
                           type="number" 
@@ -1142,16 +1142,16 @@ const PassengerPortal = ({
                           value={offerInput}
                           onChange={handleOfferChange}
                           onBlur={handleOfferBlur}
-                          className="flex-1 h-11 bg-[#020617]/50 border border-white/10 rounded-xl px-4 text-white font-black text-base text-center outline-none focus:border-emerald-500 transition-colors"
+                          className="flex-1 bg-[#020617]/50 border border-white/10 rounded-xl px-4 py-3 text-white font-black text-lg text-center outline-none focus:border-emerald-500 transition-colors"
                       />
-                      <button onClick={() => adjustOffer(0.5)} className="w-11 h-11 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all">
-                          <i className="fas fa-plus text-xs"></i>
+                      <button onClick={() => adjustOffer(0.5)} className="w-12 h-12 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all">
+                          <i className="fas fa-plus"></i>
                       </button>
                    </div>
                </div>
             </div>
 
-            <button onClick={handleSubmit} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-[1.01] transition-transform">Confirm Request</button>
+            <button onClick={handleSubmit} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">Confirm Request</button>
          </div>
       </div>
     );
@@ -1471,6 +1471,7 @@ const AiHelpDesk = ({ onClose, settings }: any) => {
   );
 };
 
+// ... (rest of components like DriverPortal, AdminPortal same as before until App)
 const DriverPortal = ({ 
   drivers, 
   activeDriver, 
@@ -1631,7 +1632,7 @@ const DriverPortal = ({
       }
 
       return (
-          <div className="glass p-8 rounded-[2.5rem] border border-white/10 max-sm mx-auto text-center space-y-6 animate-in zoom-in">
+          <div className="glass p-8 rounded-[2.5rem] border border-white/10 max-w-sm mx-auto text-center space-y-6 animate-in zoom-in">
              <div className="w-16 h-16 bg-indigo-600 rounded-2xl mx-auto flex items-center justify-center text-white shadow-xl shadow-indigo-600/20">
                 <i className="fas fa-id-card-clip text-2xl"></i>
              </div>
@@ -1995,6 +1996,7 @@ const DriverPortal = ({
   );
 };
 
+// ... (rest of AdminPortal etc)
 const AdminPortal = ({ 
   activeTab, 
   setActiveTab, 
@@ -2078,12 +2080,7 @@ const AdminPortal = ({
 
   const handleCreatePromo = async () => {
       if (!videoPrompt) return;
-      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-      if (!hasKey) {
-          await (window as any).aistudio.openSelectKey();
-          return;
-      }
-
+      // Note: Removed API key selection check to use default environment key
       setIsGeneratingVideo(true);
       try {
           const videoAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -2105,8 +2102,6 @@ const AdminPortal = ({
           const uri = operation.response?.generatedVideos?.[0]?.video?.uri;
           if (uri) {
               const videoUrl = `${uri}&key=${process.env.API_KEY}`;
-              // For demo purposes, we will just open it or alert. 
-              // In production, we'd save to storage.
               window.open(videoUrl, '_blank');
               setVideoPrompt('');
               alert("Video Generated! Opening in new tab.");
@@ -2114,9 +2109,6 @@ const AdminPortal = ({
       } catch (err: any) {
           console.error("Video Gen Error", err);
           alert("Video generation failed: " + err.message);
-          if (err.message.includes("Requested entity was not found")) {
-             await (window as any).aistudio.openSelectKey();
-          }
       } finally {
           setIsGeneratingVideo(false);
       }
@@ -3472,7 +3464,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Fixed handleDriverLogout: removed undeclared driverId and ensured removeItem receives only 1 argument
   const handleDriverLogout = () => {
     setActiveDriverId(null);
     sessionStorage.removeItem('nexryde_driver_session_v1');
@@ -4056,3 +4047,4 @@ if (rootElement) {
   const root = ReactDOM.createRoot(rootElement);
   root.render(<App />);
 }
+
