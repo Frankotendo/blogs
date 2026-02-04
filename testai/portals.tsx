@@ -1042,10 +1042,25 @@ export const AdminPortal = ({
   const [newMission, setNewMission] = useState<HubMission>({ id: '', location: '', description: '', entryFee: 2, driversJoined: [], status: 'open', createdAt: '' });
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
 
+  // Sync settings when props update
   useEffect(() => { setLocalSettings(settings); }, [settings]);
 
+  // Helper component for cleaner settings form
+  const SettingInput = ({ label, value, onChange, type = "text", placeholder = "" }: any) => (
+    <div className="space-y-1">
+        <label className="text-[9px] text-slate-500 uppercase font-bold pl-2">{label}</label>
+        <input 
+            type={type} 
+            value={value || ''} 
+            onChange={onChange} 
+            placeholder={placeholder}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs outline-none focus:border-rose-500 transition-colors" 
+        />
+    </div>
+  );
+
   return (
-    <div className="space-y-6 animate-in fade-in">
+    <div className="space-y-6 animate-in fade-in pb-20">
         <div className="flex flex-wrap gap-2 mb-6 bg-white/5 p-2 rounded-[1.5rem] border border-white/5">
             {['monitor', 'drivers', 'rides', 'finance', 'missions', 'config'].map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>
@@ -1103,7 +1118,7 @@ export const AdminPortal = ({
                                     <span className={`text-[8px] px-2 py-0.5 rounded font-black uppercase ${d.status === 'online' ? 'bg-emerald-500 text-black' : 'bg-slate-700 text-slate-300'}`}>{d.status}</span>
                                     <span className="text-[9px] text-slate-400">{d.vehicleType}</span>
                                 </div>
-                                <p className="text-[9px] text-slate-500 mt-1">{d.contact} • ₵{d.walletBalance}</p>
+                                <p className="text-[9px] text-slate-500 mt-1">{d.contact} • ₵{d.walletBalance.toFixed(2)}</p>
                             </div>
                             <div className="flex flex-col gap-2">
                                 <button onClick={() => onForceResetDriver(d.id)} className="px-3 py-1 bg-amber-500/10 text-amber-500 rounded-lg text-[8px] font-black uppercase hover:bg-amber-500 hover:text-black">Reset</button>
@@ -1219,23 +1234,118 @@ export const AdminPortal = ({
         )}
 
         {activeTab === 'config' && (
-            <div className="glass p-6 rounded-[2rem] border border-white/10 space-y-6">
-                 <h3 className="text-white font-black uppercase text-xs tracking-widest">Global Configuration</h3>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <div className="space-y-2">
-                         <label className="text-[9px] text-slate-500 uppercase font-bold pl-2">Admin MoMo Number</label>
-                         <input value={localSettings.adminMomo} onChange={e => setLocalSettings({...localSettings, adminMomo: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs outline-none focus:border-rose-500" />
+            <div className="glass p-6 rounded-[2rem] border border-white/10 space-y-8">
+                 <div className="flex justify-between items-center">
+                    <h3 className="text-white font-black uppercase text-xs tracking-widest">Global Configuration</h3>
+                    <button onClick={() => onUpdateSettings(localSettings)} className="px-6 py-2 bg-emerald-500 text-[#020617] rounded-xl font-black text-[9px] uppercase shadow-lg hover:bg-emerald-400 transition-all">Save Changes</button>
+                 </div>
+                 
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                     <div className="space-y-4">
+                         <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest border-b border-indigo-500/30 pb-2">Pricing & Fares</h4>
+                         <SettingInput label="Pragia Base Fare (₵)" value={localSettings.farePerPragia} onChange={(e: any) => setLocalSettings({...localSettings, farePerPragia: parseFloat(e.target.value)})} type="number" />
+                         <SettingInput label="Taxi Base Fare (₵)" value={localSettings.farePerTaxi} onChange={(e: any) => setLocalSettings({...localSettings, farePerTaxi: parseFloat(e.target.value)})} type="number" />
+                         <SettingInput label="Solo Multiplier (x)" value={localSettings.soloMultiplier} onChange={(e: any) => setLocalSettings({...localSettings, soloMultiplier: parseFloat(e.target.value)})} type="number" />
+                         <SettingInput label="Seat Commission (₵)" value={localSettings.commissionPerSeat} onChange={(e: any) => setLocalSettings({...localSettings, commissionPerSeat: parseFloat(e.target.value)})} type="number" />
+                         <SettingInput label="Shuttle Commission (₵)" value={localSettings.shuttleCommission} onChange={(e: any) => setLocalSettings({...localSettings, shuttleCommission: parseFloat(e.target.value)})} type="number" />
+                         <SettingInput label="Registration Fee (₵)" value={localSettings.registrationFee} onChange={(e: any) => setLocalSettings({...localSettings, registrationFee: parseFloat(e.target.value)})} type="number" />
                      </div>
-                     <div className="space-y-2">
-                         <label className="text-[9px] text-slate-500 uppercase font-bold pl-2">Base Fare (Pragia)</label>
-                         <input type="number" value={localSettings.farePerPragia} onChange={e => setLocalSettings({...localSettings, farePerPragia: parseFloat(e.target.value)})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs outline-none focus:border-rose-500" />
-                     </div>
-                     <div className="col-span-full space-y-2">
-                          <label className="text-[9px] text-slate-500 uppercase font-bold pl-2">Hub Announcement (Banner)</label>
-                          <input value={localSettings.hub_announcement || ''} onChange={e => setLocalSettings({...localSettings, hub_announcement: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs outline-none focus:border-rose-500" placeholder="Broadcast message to all users" />
+
+                     <div className="space-y-4">
+                         <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest border-b border-amber-500/30 pb-2">Admin Contacts</h4>
+                         <SettingInput label="Admin MoMo Number" value={localSettings.adminMomo} onChange={(e: any) => setLocalSettings({...localSettings, adminMomo: e.target.value})} />
+                         <SettingInput label="MoMo Account Name" value={localSettings.adminMomoName} onChange={(e: any) => setLocalSettings({...localSettings, adminMomoName: e.target.value})} />
+                         <SettingInput label="Support WhatsApp" value={localSettings.whatsappNumber} onChange={(e: any) => setLocalSettings({...localSettings, whatsappNumber: e.target.value})} />
+                         <SettingInput label="Facebook URL" value={localSettings.facebookUrl} onChange={(e: any) => setLocalSettings({...localSettings, facebookUrl: e.target.value})} placeholder="https://facebook.com/..." />
+                         <SettingInput label="Instagram URL" value={localSettings.instagramUrl} onChange={(e: any) => setLocalSettings({...localSettings, instagramUrl: e.target.value})} placeholder="https://instagram.com/..." />
+                         <SettingInput label="TikTok URL" value={localSettings.tiktokUrl} onChange={(e: any) => setLocalSettings({...localSettings, tiktokUrl: e.target.value})} placeholder="https://tiktok.com/@..." />
                      </div>
                  </div>
-                 <button onClick={() => onUpdateSettings(localSettings)} className="w-full py-4 bg-rose-600 text-white rounded-xl font-black text-xs uppercase shadow-xl hover:bg-rose-500 transition-all">Save System Configuration</button>
+
+                 <div className="space-y-4 pt-4 border-t border-white/5">
+                     <h4 className="text-[10px] font-black text-rose-400 uppercase tracking-widest border-b border-rose-500/30 pb-2">App Content & AI</h4>
+                     
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <SettingInput label="AI Assistant Name" value={localSettings.aiAssistantName} onChange={(e: any) => setLocalSettings({...localSettings, aiAssistantName: e.target.value})} />
+                        <SettingInput label="Hub Announcement (Top Banner)" value={localSettings.hub_announcement} onChange={(e: any) => setLocalSettings({...localSettings, hub_announcement: e.target.value})} placeholder="Message for all users..." />
+                     </div>
+
+                     <div className="space-y-2">
+                        <label className="text-[9px] text-slate-500 uppercase font-bold pl-2">About App / Manifesto</label>
+                        <textarea 
+                            value={localSettings.aboutMeText || ''} 
+                            onChange={e => setLocalSettings({...localSettings, aboutMeText: e.target.value})} 
+                            className="w-full h-32 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs outline-none focus:border-rose-500 resize-none transition-colors"
+                        />
+                     </div>
+
+                     <div className="space-y-2">
+                        <label className="text-[9px] text-slate-500 uppercase font-bold pl-2">Portfolio Images (Upload to Add)</label>
+                        <input type="file" multiple accept="image/*" onChange={async (e) => {
+                            if(e.target.files) {
+                                const promises = Array.from(e.target.files).map(f => compressImage(f, 0.6, 800));
+                                const results = await Promise.all(promises);
+                                setLocalSettings({...localSettings, aboutMeImages: [...(localSettings.aboutMeImages || []), ...results]});
+                            }
+                        }} className="block w-full text-[10px] text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-white/10 file:text-white hover:file:bg-white/20"/>
+                        
+                        <div className="flex gap-3 overflow-x-auto py-2">
+                            {localSettings.aboutMeImages?.map((img: string, i: number) => (
+                                <div key={i} className="relative w-20 h-20 shrink-0 group">
+                                    <img src={img} className="w-full h-full object-cover rounded-xl border border-white/10" />
+                                    <button onClick={() => {
+                                        const newImgs = [...localSettings.aboutMeImages];
+                                        newImgs.splice(i, 1);
+                                        setLocalSettings({...localSettings, aboutMeImages: newImgs});
+                                    }} className="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><i className="fas fa-times text-[10px]"></i></button>
+                                </div>
+                            ))}
+                        </div>
+                     </div>
+                 </div>
+
+                 <div className="space-y-4 pt-4 border-t border-white/5">
+                     <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest border-b border-emerald-500/30 pb-2">Monetization (AdSense)</h4>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <SettingInput label="AdSense Client ID" value={localSettings.adSenseClientId} onChange={(e: any) => setLocalSettings({...localSettings, adSenseClientId: e.target.value})} />
+                        <SettingInput label="AdSense Slot ID" value={localSettings.adSenseSlotId} onChange={(e: any) => setLocalSettings({...localSettings, adSenseSlotId: e.target.value})} />
+                        <div className="space-y-1">
+                            <label className="text-[9px] text-slate-500 uppercase font-bold pl-2">Ad Status</label>
+                            <select value={localSettings.adSenseStatus || 'inactive'} onChange={e => setLocalSettings({...localSettings, adSenseStatus: e.target.value as any})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs outline-none focus:border-rose-500">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                     </div>
+                 </div>
+
+                 <div className="space-y-4 pt-4 border-t border-white/5">
+                     <h4 className="text-[10px] font-black text-purple-400 uppercase tracking-widest border-b border-purple-500/30 pb-2">Branding</h4>
+                     
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-[9px] text-slate-500 uppercase font-bold pl-2">App Logo</label>
+                            <input type="file" accept="image/*" onChange={async (e) => {
+                                if(e.target.files?.[0]) {
+                                    const b64 = await compressImage(e.target.files[0], 0.8, 200);
+                                    setLocalSettings({...localSettings, appLogo: b64});
+                                }
+                            }} className="block w-full text-[10px] text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-white/10 file:text-white hover:file:bg-white/20"/>
+                            {localSettings.appLogo && <div className="mt-2 w-16 h-16 bg-black/20 rounded-xl p-2 border border-white/10"><img src={localSettings.appLogo} className="w-full h-full object-contain" /></div>}
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[9px] text-slate-500 uppercase font-bold pl-2">App Wallpaper</label>
+                            <input type="file" accept="image/*" onChange={async (e) => {
+                                if(e.target.files?.[0]) {
+                                    const b64 = await compressImage(e.target.files[0], 0.7, 1024);
+                                    setLocalSettings({...localSettings, appWallpaper: b64});
+                                }
+                            }} className="block w-full text-[10px] text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-white/10 file:text-white hover:file:bg-white/20"/>
+                            {localSettings.appWallpaper && <div className="mt-2 w-full h-32 bg-black/20 rounded-xl overflow-hidden border border-white/10 relative"><img src={localSettings.appWallpaper} className="w-full h-full object-cover" /></div>}
+                        </div>
+                     </div>
+                 </div>
             </div>
         )}
     </div>
