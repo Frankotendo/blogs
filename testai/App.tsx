@@ -102,6 +102,16 @@ export const App: React.FC = () => {
 
   const isVaultAccess = useMemo(() => isAdminAuthenticated, [isAdminAuthenticated]);
 
+  // Handle /?access=vault deep link
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('access') === 'vault') {
+      setViewMode('admin');
+      // Optional: Clean up URL without refreshing
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   const fetchPublicData = async () => {
       const [ { data: sData }, { data: nData }, { data: mData } ] = await Promise.all([
           supabase.from('unihub_settings').select('*').single(),
@@ -427,7 +437,7 @@ export const App: React.FC = () => {
         }}
         triggerRef={triggerVoiceRef}
       />
-      {!currentUser ? (
+      {!currentUser && viewMode !== 'admin' ? (
          <HubGateway onIdentify={handleGlobalUserAuth} settings={settings} formState={authFormState} setFormState={setAuthFormState} onTriggerVoice={() => triggerVoiceRef.current?.()} />
       ) : (
         <>
@@ -453,7 +463,7 @@ export const App: React.FC = () => {
             <div className="flex-1 space-y-1">
               <NavItem active={viewMode === 'passenger'} icon="fa-user-graduate" label="Ride Center" onClick={() => setViewMode('passenger')} />
               <NavItem active={viewMode === 'driver'} icon="fa-id-card-clip" label="Partner Terminal" onClick={() => setViewMode('driver')} />
-              {(isVaultAccess || isAdminAuthenticated) && <NavItem active={viewMode === 'admin'} icon="fa-shield-halved" label="Control Vault" onClick={() => setViewMode('admin')} badge={isAdminAuthenticated && pendingRequestsCount > 0 ? pendingRequestsCount : undefined} />}
+              {(isVaultAccess || isAdminAuthenticated || viewMode === 'admin') && <NavItem active={viewMode === 'admin'} icon="fa-shield-halved" label="Control Vault" onClick={() => setViewMode('admin')} badge={isAdminAuthenticated && pendingRequestsCount > 0 ? pendingRequestsCount : undefined} />}
               <NavItem active={false} icon="fa-share-nodes" label="Invite Others" onClick={shareHub} />
               <button onClick={handleLogout} className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-slate-500 hover:bg-white/5 transition-all mt-4"><i className="fas fa-power-off text-lg w-6"></i><span className="text-sm font-bold">Sign Out</span></button>
             </div>
@@ -537,8 +547,16 @@ export const App: React.FC = () => {
               )}
             </div>
           </main>
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#020617]/95 backdrop-blur-xl border-t border-white/5 px-6 py-4 flex justify-between items-center z-[100]">
+            <MobileNavItem active={viewMode === 'passenger'} icon="fa-user-graduate" label="Rides" onClick={() => setViewMode('passenger')} />
+            <MobileNavItem active={viewMode === 'driver'} icon="fa-id-card-clip" label="Partner" onClick={() => setViewMode('driver')} />
+            {(isVaultAccess || isAdminAuthenticated || viewMode === 'admin') && <MobileNavItem active={viewMode === 'admin'} icon="fa-shield-halved" label="Vault" onClick={() => setViewMode('admin')} badge={isAdminAuthenticated && pendingRequestsCount > 0 ? pendingRequestsCount : undefined} />}
+            <MobileNavItem active={showAiHelp} icon="fa-sparkles" label="Kofi" onClick={() => setShowAiHelp(true)} />
+            <MobileNavItem active={false} icon="fa-power-off" label="Exit" onClick={handleLogout} />
+          </div>
         </>
       )}
+      {showAiHelp && <AiHelpDesk onClose={() => setShowAiHelp(false)} settings={settings} />}
     </div>
   );
 }
