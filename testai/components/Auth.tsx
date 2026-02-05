@@ -101,7 +101,10 @@ export const HubGateway = ({
   }, [cameraStream, isCameraOpen, authStage]);
 
   const capturePhoto = () => {
-      if (!videoRef.current || !canvasRef.current) return;
+      if (!videoRef.current || !canvasRef.current) {
+          console.error("Capture failed: refs missing", { video: !!videoRef.current, canvas: !!canvasRef.current });
+          return;
+      }
       
       const context = canvasRef.current.getContext('2d');
       if (context) {
@@ -166,6 +169,9 @@ export const HubGateway = ({
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#020617] p-4 relative overflow-hidden">
+      {/* Hidden processing canvas used for image capturing - MUST be in DOM always */}
+      <canvas ref={canvasRef} width="300" height="300" className="hidden" />
+
       <div className="absolute inset-0 bg-gradient-to-tr from-indigo-900/20 to-purple-900/20"></div>
       
       <div className="glass-bright w-full max-w-md p-8 rounded-[3rem] border border-white/10 relative z-10 animate-in zoom-in duration-500">
@@ -315,7 +321,6 @@ export const HubGateway = ({
                         </div>
                     )}
                 </div>
-                <canvas ref={canvasRef} width="300" height="300" className="hidden" />
 
                 <div>
                     <h3 className="text-xl font-black italic uppercase text-white">Biometric Scan</h3>
@@ -349,4 +354,3 @@ export const HubGateway = ({
     </div>
   );
 };
-
