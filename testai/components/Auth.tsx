@@ -21,7 +21,7 @@ export const HubGateway = ({
   const [otpCode, setOtpCode] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
   
-  // Biometric State
+  // Biometric/Camera State
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -31,7 +31,7 @@ export const HubGateway = ({
   const [biometricStatus, setBiometricStatus] = useState<'idle' | 'success' | 'failed'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
 
-  // 1. Initial Submit Handler (Triggers 3FA if Login)
+  // 1. Initial Submit Handler
   const handleInitialSubmit = async () => {
     if (!formState.phone || !formState.pin) {
       alert("Please fill all fields.");
@@ -39,14 +39,17 @@ export const HubGateway = ({
     }
 
     if (formState.mode === 'signup') {
-        // Signup Flow: Require Photo Capture
         if (!capturedImage) {
-            alert("Security Requirement: Please verify your identity by taking a selfie or uploading a photo.");
+            alert("Security Requirement: Please capture a live selfie or upload a photo to verify your identity.");
             return;
         }
-        await completeSignup();
+        const hashedPin = await hashPin(formState.pin);
+        onIdentify(formState.username, formState.phone, hashedPin, 'signup');
+        // Update biometric photo after user is created (handled in App.tsx)
+        setTimeout(async () => {
+             await supabase.from('unihub_users').update({ biometric_url: capturedImage }).eq('phone', formState.phone);
+        }, 1000);
     } else {
-        // Login Flow: Start 3FA Waterfall
         generateAndShowOtp();
     }
   };
@@ -57,7 +60,6 @@ export const HubGateway = ({
       setGeneratedOtp(code);
       setAuthStage('otp');
       
-      // Simulate SMS Toast
       const toast = document.createElement('div');
       toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-4 rounded-2xl shadow-2xl z-[9999] animate-in slide-in-from-top flex items-center gap-4 border border-slate-200';
       toast.innerHTML = `
@@ -73,24 +75,22 @@ export const HubGateway = ({
 
   const verifyOtp = () => {
       if (otpCode === generatedOtp) {
-          // Stage 3: Biometric
           setAuthStage('biometric');
-          // Try to auto-start camera, but don't block if it fails
           startCamera();
       } else {
           alert("Incorrect Code. Please try again.");
       }
   };
 
-  // 3. Biometric Logic
+  // 3. Camera Controls
   const startCamera = async () => {
       try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
           setCameraStream(stream);
           setIsCameraOpen(true);
       } catch (err) {
-          console.warn("Camera access denied or unavailable", err);
-          // Allow fallback
+          console.warn("Camera access denied", err);
+          alert("Camera access denied. Please use the 'Upload' option if on a desktop without a webcam.");
       }
   };
 
@@ -98,7 +98,7 @@ export const HubGateway = ({
       if (videoRef.current && cameraStream) {
           videoRef.current.srcObject = cameraStream;
       }
-  }, [cameraStream, isCameraOpen]);
+  }, [cameraStream, isCameraOpen, authStage]);
 
   const capturePhoto = () => {
       if (!videoRef.current || !canvasRef.current) return;
@@ -135,12 +135,12 @@ export const HubGateway = ({
 
   const verifyFace = async (liveImage: string) => {
       setIsVerifying(true);
-      setStatusMessage("AI Analyzing Facial Structure...");
+      setStatusMessage("Analyzing facial features...");
       
       const { data: user } = await supabase.from('unihub_users').select('biometric_url').eq('phone', formState.phone).single();
       
       if (!user || !user.biometric_url) {
-          setStatusMessage("Updating Security Profile...");
+          setStatusMessage("Security profile initialized.");
           await supabase.from('unihub_users').update({ biometric_url: liveImage }).eq('phone', formState.phone);
           completeLogin();
           return;
@@ -150,11 +150,11 @@ export const HubGateway = ({
       
       if (analysis.match && analysis.confidence > 70) {
           setBiometricStatus('success');
-          setStatusMessage("Identity Verified.");
+          setStatusMessage("Identity Confirmed.");
           setTimeout(() => completeLogin(), 1000);
       } else {
           setBiometricStatus('failed');
-          setStatusMessage(`Verification Failed: ${analysis.reason}`);
+          setStatusMessage(`Mismatch: ${analysis.reason}`);
           setIsVerifying(false);
       }
   };
@@ -164,21 +164,11 @@ export const HubGateway = ({
       onIdentify(formState.username, formState.phone, hashedPin, 'login', formState.pin);
   };
 
-  const completeSignup = async () => {
-      const hashedPin = await hashPin(formState.pin);
-      onIdentify(formState.username, formState.phone, hashedPin, 'signup');
-      setTimeout(async () => {
-          if (capturedImage) {
-             await supabase.from('unihub_users').update({ biometric_url: capturedImage }).eq('phone', formState.phone);
-          }
-      }, 2000);
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#020617] p-4 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-tr from-indigo-900/20 to-purple-900/20"></div>
       
-      <div className="glass-bright w-full max-md:mt-12 max-w-md p-8 rounded-[3rem] border border-white/10 relative z-10 animate-in zoom-in duration-500">
+      <div className="glass-bright w-full max-w-md p-8 rounded-[3rem] border border-white/10 relative z-10 animate-in zoom-in duration-500">
         
         <div className="text-center mb-8">
           {settings.appLogo ? (
@@ -189,7 +179,7 @@ export const HubGateway = ({
             </div>
           )}
           <h1 className="text-3xl font-black italic uppercase tracking-tighter text-white">NexRyde</h1>
-          <p className="text-xs font-black text-amber-500 uppercase tracking-widest mt-2">Transit Excellence</p>
+          <p className="text-xs font-black text-amber-500 uppercase tracking-widest mt-2">Identity & Transit Gateway</p>
         </div>
 
         {authStage === 'initial' && (
@@ -202,21 +192,43 @@ export const HubGateway = ({
                         className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:border-amber-500 transition-all placeholder:text-slate-600"
                         placeholder="Choose Username"
                         />
-                        <div className="flex gap-2">
-                            <div 
-                                onClick={startCamera}
-                                className={`flex-1 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${capturedImage ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/10 hover:border-amber-500/50 bg-white/5'}`}
-                            >
-                                <i className="fas fa-camera text-slate-400 mb-2"></i>
-                                <span className="text-[9px] font-black uppercase text-slate-500">Selfie</span>
+                        
+                        {isCameraOpen ? (
+                            <div className="relative h-48 rounded-2xl overflow-hidden border-2 border-amber-500 shadow-lg shadow-amber-500/20 animate-in fade-in">
+                                <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="w-32 h-32 border-2 border-dashed border-white/30 rounded-full"></div>
+                                </div>
+                                <button 
+                                    onClick={capturePhoto}
+                                    className="absolute bottom-4 left-1/2 -translate-x-1/2 px-6 py-2 bg-white text-black font-black text-[10px] uppercase rounded-full shadow-xl"
+                                >
+                                    Capture Selfie
+                                </button>
                             </div>
-                            <label className={`flex-1 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${capturedImage ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/10 hover:border-amber-500/50 bg-white/5'}`}>
-                                <i className="fas fa-upload text-slate-400 mb-2"></i>
-                                <span className="text-[9px] font-black uppercase text-slate-500">Upload</span>
-                                <input type="file" accept="image/*" className="hidden" onChange={handleManualUpload} />
-                            </label>
-                        </div>
-                        {capturedImage && <p className="text-center text-[10px] text-emerald-400 font-bold uppercase">Photo Captured</p>}
+                        ) : (
+                            <div className="flex gap-2">
+                                <div 
+                                    onClick={startCamera}
+                                    className={`flex-1 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${capturedImage ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/10 hover:border-amber-500/50 bg-white/5'}`}
+                                >
+                                    {capturedImage ? (
+                                        <img src={capturedImage} className="w-full h-full object-cover rounded-xl" />
+                                    ) : (
+                                        <>
+                                            <i className="fas fa-camera text-slate-400 mb-2"></i>
+                                            <span className="text-[9px] font-black uppercase text-slate-500">Live Selfie</span>
+                                        </>
+                                    )}
+                                </div>
+                                <label className={`flex-1 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${capturedImage && !isCameraOpen ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/10 hover:border-amber-500/50 bg-white/5'}`}>
+                                    <i className="fas fa-upload text-slate-400 mb-2"></i>
+                                    <span className="text-[9px] font-black uppercase text-slate-500">Upload Photo</span>
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleManualUpload} />
+                                </label>
+                            </div>
+                        )}
+                        {capturedImage && !isCameraOpen && <p className="text-center text-[10px] text-emerald-400 font-bold uppercase">Identity Photo Set</p>}
                     </div>
                 )}
                 
@@ -237,7 +249,8 @@ export const HubGateway = ({
                 
                 <button 
                     onClick={handleInitialSubmit}
-                    className="w-full bg-amber-500 text-[#020617] py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] transition-transform shadow-xl"
+                    disabled={isCameraOpen}
+                    className="w-full bg-amber-500 text-[#020617] py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] transition-transform shadow-xl disabled:opacity-50"
                 >
                     {formState.mode === 'login' ? 'Continue' : 'Create Identity'}
                 </button>
@@ -247,10 +260,11 @@ export const HubGateway = ({
                         onClick={() => {
                             setFormState({...formState, mode: formState.mode === 'login' ? 'signup' : 'login'});
                             setCapturedImage(null);
+                            stopCamera();
                         }}
                         className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors"
                     >
-                        {formState.mode === 'login' ? 'New here? Create Account' : 'Have an account? Login'}
+                        {formState.mode === 'login' ? 'Join NexRyde? Create Profile' : 'Already have a profile? Login'}
                     </button>
                 </div>
             </div>
@@ -262,8 +276,8 @@ export const HubGateway = ({
                     <i className="fas fa-shield-alt text-2xl"></i>
                 </div>
                 <div>
-                    <h3 className="text-xl font-black italic uppercase text-white">Security Check</h3>
-                    <p className="text-xs text-slate-400 mt-2">Enter the 6-digit code sent to your device.</p>
+                    <h3 className="text-xl font-black italic uppercase text-white">Security Verification</h3>
+                    <p className="text-xs text-slate-400 mt-2">Enter the 6-digit code mirrored to your handset.</p>
                 </div>
                 <input 
                     value={otpCode}
@@ -275,9 +289,9 @@ export const HubGateway = ({
                     onClick={verifyOtp}
                     className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-xl"
                 >
-                    Verify Code
+                    Confirm Code
                 </button>
-                <button onClick={() => setAuthStage('initial')} className="text-[10px] font-bold text-slate-500 uppercase">Cancel Login</button>
+                <button onClick={() => setAuthStage('initial')} className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Abort Login</button>
             </div>
         )}
 
@@ -295,7 +309,7 @@ export const HubGateway = ({
                              {capturedImage ? <img src={capturedImage} className="w-full h-full object-cover" /> : (
                                 <>
                                     <i className="fas fa-face-viewfinder text-4xl text-slate-500"></i>
-                                    <p className="text-[8px] text-slate-500 font-bold uppercase">No Camera Feed</p>
+                                    <p className="text-[8px] text-slate-500 font-bold uppercase">Awaiting Feed</p>
                                 </>
                              )}
                         </div>
@@ -304,19 +318,19 @@ export const HubGateway = ({
                 <canvas ref={canvasRef} width="300" height="300" className="hidden" />
 
                 <div>
-                    <h3 className="text-xl font-black italic uppercase text-white">Face Scan</h3>
+                    <h3 className="text-xl font-black italic uppercase text-white">Biometric Scan</h3>
                     <p className={`text-xs font-bold mt-2 uppercase tracking-widest ${biometricStatus === 'failed' ? 'text-rose-500' : biometricStatus === 'success' ? 'text-emerald-400' : 'text-slate-400'}`}>
-                        {statusMessage || "Verifying Identity..."}
+                        {statusMessage || "Align your face to verify identity..."}
                     </p>
                 </div>
 
                 {!isVerifying && biometricStatus !== 'success' && (
                    <div className="space-y-3">
-                       <button onClick={capturePhoto} className="w-full bg-emerald-500 text-[#020617] py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">
-                          {isCameraOpen ? 'Snap & Verify' : 'Use Camera'}
+                       <button onClick={isCameraOpen ? capturePhoto : startCamera} className="w-full bg-emerald-500 text-[#020617] py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">
+                          {isCameraOpen ? 'Analyze Now' : 'Initialize Camera'}
                        </button>
-                       <label className="block w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-xs uppercase tracking-widest cursor-pointer border border-white/5 transition-colors">
-                           Upload Photo Instead
+                       <label className="block w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest cursor-pointer border border-white/5 transition-colors">
+                           Upload Instead
                            <input type="file" accept="image/*" className="hidden" onChange={handleManualUpload} />
                        </label>
                    </div>
@@ -327,7 +341,7 @@ export const HubGateway = ({
         <div className="mt-8 pt-6 border-t border-white/5 flex justify-center">
              <button onClick={onTriggerVoice} className="text-slate-500 hover:text-indigo-400 transition-colors flex items-center gap-2">
                  <i className="fas fa-microphone"></i>
-                 <span className="text-[10px] font-black uppercase tracking-widest">Voice Assist</span>
+                 <span className="text-[10px] font-black uppercase tracking-widest">Kofi Assistant</span>
              </button>
         </div>
 
@@ -335,3 +349,4 @@ export const HubGateway = ({
     </div>
   );
 };
+
