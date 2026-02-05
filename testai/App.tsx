@@ -163,7 +163,9 @@ export const App: React.FC = () => {
           setRegistrationRequests(results[3].data || []);
       } else if (currentUser && results[1].data) {
           const uData = results[1].data;
-          const updatedUser = { ...currentUser, walletBalance: uData.walletBalance ?? 0 };
+          // Gracefully handle potentially missing or differently named wallet column from schema cache
+          const balance = uData.walletBalance ?? uData.wallet_balance ?? 0;
+          const updatedUser = { ...currentUser, walletBalance: Number(balance) };
           setCurrentUser(updatedUser);
           localStorage.setItem('nexryde_user_v1', JSON.stringify(updatedUser));
       }
@@ -283,7 +285,8 @@ export const App: React.FC = () => {
              return;
         }
 
-        const safeUser = { ...user, walletBalance: user.walletBalance ?? 0 };
+        const balance = user.walletBalance ?? (user as any).wallet_balance ?? 0;
+        const safeUser = { ...user, walletBalance: Number(balance) };
         setCurrentUser(safeUser);
         localStorage.setItem('nexryde_user_v1', JSON.stringify(safeUser));
       } else {
@@ -294,9 +297,26 @@ export const App: React.FC = () => {
         }
         if (!username) { alert("Please enter a username for your profile."); setIsSyncing(false); return; }
         
-        const newUser: UniUser = { id: `USER-${Date.now()}`, username, phone, pin: hashedPin, walletBalance: 0 };
+        const newUser: UniUser = { 
+            id: `USER-${Date.now()}`, 
+            username, 
+            phone, 
+            pin: hashedPin, 
+            walletBalance: 0 
+        };
         const { error: insertErr } = await supabase.from('unihub_users').insert([newUser]);
-        if (insertErr) throw insertErr;
+        if (insertErr) {
+            // Handle if insert failed because of walletBalance column in schema cache
+            if (insertErr.message.includes('walletBalance')) {
+                 const legacyUser = { ...newUser };
+                 delete (legacyUser as any).walletBalance;
+                 (legacyUser as any).wallet_balance = 0;
+                 const { error: retryErr } = await supabase.from('unihub_users').insert([legacyUser]);
+                 if (retryErr) throw retryErr;
+            } else {
+                throw insertErr;
+            }
+        }
         
         setCurrentUser(newUser);
         localStorage.setItem('nexryde_user_v1', JSON.stringify(newUser));
@@ -311,8 +331,16 @@ export const App: React.FC = () => {
   const handleManualCredit = async (identifier: string, amount: number) => {
       const { data: userData } = await supabase.from('unihub_users').select('*').eq('phone', identifier).maybeSingle();
       if (userData) {
-          const newBal = (userData.walletBalance || 0) + amount;
-          await supabase.from('unihub_users').update({ walletBalance: newBal }).eq('id', userData.id);
+          const bal = userData.walletBalance ?? (userData as any).wallet_balance ?? 0;
+          const newBal = Number(bal) + amount;
+          
+          // Try both naming conventions
+          const updates: any = { walletBalance: newBal };
+          const { error } = await supabase.from('unihub_users').update(updates).eq('id', userData.id);
+          if (error) {
+              await supabase.from('unihub_users').update({ wallet_balance: newBal }).eq('id', userData.id);
+          }
+          
           alert(`Credited User ${userData.username} with ₵${amount}. New Balance: ₵${newBal}`);
           return;
       }
@@ -472,10 +500,16 @@ export const App: React.FC = () => {
         const driverEarnings = totalFare - totalCommission;
 
         for (const p of node.passengers) {
-             const { data: uData } = await supabase.from('unihub_users').select('id, walletBalance').eq('phone', p.phone).single();
+             const { data: uData } = await supabase.from('unihub_users').select('*').eq('phone', p.phone).single();
              if (uData) {
-                 const newBalance = (uData.walletBalance ?? 0) - node.farePerPerson;
-                 await supabase.from('unihub_users').update({ walletBalance: newBalance }).eq('id', uData.id);
+                 const bal = uData.walletBalance ?? (uData as any).wallet_balance ?? 0;
+                 const newBalance = Number(bal) - node.farePerPerson;
+                 
+                 const updates: any = { walletBalance: newBalance };
+                 const { error: updErr } = await supabase.from('unihub_users').update(updates).eq('id', uData.id);
+                 if (updErr) {
+                     await supabase.from('unihub_users').update({ wallet_balance: newBalance }).eq('id', uData.id);
+                 }
                  
                  await supabase.from('unihub_transactions').insert([{
                     id: `TX-RIDE-${Date.now()}-${p.phone.slice(-4)}`,
@@ -647,9 +681,17 @@ export const App: React.FC = () => {
       };
 
       try {
+          const bal = currentUser.walletBalance ?? (currentUser as any).wallet_balance ?? 0;
+          const newTotal = Number(bal) + amount;
+          
+          const updates: any = { walletBalance: newTotal };
+          
           await Promise.all([
               supabase.from('unihub_topups').insert([req]),
-              supabase.from('unihub_users').update({ walletBalance: (currentUser.walletBalance ?? 0) + amount }).eq('id', currentUser.id),
+              supabase.from('unihub_users').update(updates).eq('id', currentUser.id).then(r => {
+                  if (r.error) return supabase.from('unihub_users').update({ wallet_balance: newTotal }).eq('id', currentUser.id);
+                  return r;
+              }),
               supabase.from('unihub_transactions').insert([{
                   id: `TX-TOPUP-${Date.now()}`,
                   userId: currentUser.id,
@@ -660,8 +702,7 @@ export const App: React.FC = () => {
               }])
           ]);
           
-          const updatedBalance = (currentUser.walletBalance ?? 0) + amount;
-          const updatedUser = { ...currentUser, walletBalance: updatedBalance };
+          const updatedUser = { ...currentUser, walletBalance: newTotal };
           setCurrentUser(updatedUser);
           localStorage.setItem('nexryde_user_v1', JSON.stringify(updatedUser));
           
@@ -719,7 +760,14 @@ export const App: React.FC = () => {
     } else if (req.userId) {
         const { data: user } = await supabase.from('unihub_users').select('*').eq('id', req.userId).single();
         if (user) {
-            await supabase.from('unihub_users').update({ walletBalance: (user.walletBalance ?? 0) + req.amount }).eq('id', req.userId);
+            const bal = user.walletBalance ?? (user as any).wallet_balance ?? 0;
+            const newBal = Number(bal) + req.amount;
+            
+            const updates: any = { walletBalance: newBal };
+            const { error } = await supabase.from('unihub_users').update(updates).eq('id', req.userId);
+            if (error) {
+                await supabase.from('unihub_users').update({ wallet_balance: newBal }).eq('id', req.userId);
+            }
         }
     }
 
