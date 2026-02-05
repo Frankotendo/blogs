@@ -44,10 +44,14 @@ export const GlobalVoiceOrb = ({
     }
   }, [triggerRef, isActive]);
 
-  // Haptic Helper
+  // Enhanced Haptic Helper
   const vibrate = (pattern: number | number[]) => {
-      if ('vibrate' in navigator) {
-          navigator.vibrate(pattern);
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          try {
+              navigator.vibrate(pattern);
+          } catch (e) {
+              console.debug("Vibration failed", e);
+          }
       }
   };
 
@@ -110,10 +114,12 @@ export const GlobalVoiceOrb = ({
     if (isActive) {
       setIsActive(false);
       setState('idle');
-      vibrate(10);
+      vibrate(20); // Quick end pulse
       if (sessionRef.current) {
-        sessionRef.current.then((session: any) => session.close()).catch((err: any) => console.error("Failed to close session:", err));
+        sessionRef.current.then((session: any) => session.close()).catch(() => {});
       }
+      sourcesRef.current.forEach(s => { try { s.stop(); } catch(e) {} });
+      sourcesRef.current.clear();
       audioContextRef.current?.close();
       inputAudioContextRef.current?.close();
       return;
@@ -121,74 +127,52 @@ export const GlobalVoiceOrb = ({
 
     setIsActive(true);
     setState('connecting');
-    vibrate([40, 40, 40]); // Sharp double pulse for start
+    
+    // Wake up audio and prime vibration
+    vibrate([40, 40]); 
 
     let tools: FunctionDeclaration[] = [];
     let systemInstruction = "";
 
-    const ghanaianPersona = `You are Kofi, the NexRyde Ghanaian Assistant. Speak English, Twi, or Pidgin. Call tools incrementally. Be fast.`;
+    const ghanaianPersona = `Ghanaian AI Kofi. Be ultra-concise. English/Twi/Pidgin. Fix forms instantly. No filler words.`;
 
     if (mode === 'driver') {
-      systemInstruction = `${ghanaianPersona} Driver: ${user?.name || 'Partner'}. Update status or check wallet.`;
-      tools = [
-        {
+      systemInstruction = `${ghanaianPersona} Driver: ${user?.name || 'Partner'}. Available tools: update_status, check_wallet.`;
+      tools = [{
           name: 'update_status',
-          description: 'Update availability.',
-          parameters: {
-             type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ['online', 'busy', 'offline'] } },
-             required: ['status']
-          }
-        },
-        { name: 'check_wallet', description: 'Check balance.' }
-      ];
+          description: 'Set status to online, busy, or offline.',
+          parameters: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ['online', 'busy', 'offline'] } }, required: ['status'] }
+        }, { name: 'check_wallet', description: 'Check earnings.' }];
     } else if (mode === 'admin') {
-      systemInstruction = `Authorize protocol. Access logs and revenue. Be precise.`;
-      tools = [
-        { name: 'get_revenue_report', description: 'Total hub revenue.' },
-        { name: 'system_health_check', description: 'System counts.' }
-      ];
+      systemInstruction = `Admin Terminal Kofi. Monitor Revenue & Health. Tools: get_revenue_report, system_health_check.`;
+      tools = [{ name: 'get_revenue_report', description: 'Show total money.' }, { name: 'system_health_check', description: 'Show app counts.' }];
     } else if (mode === 'public') {
-       systemInstruction = `${ghanaianPersona} Help with Login/Signup. Capture phone/name/pin via fill_auth_details immediately.`;
-       tools = [
-         {
+       systemInstruction = `${ghanaianPersona} Capture credentials fast: name, phone, pin via fill_auth_details.`;
+       tools = [{
            name: 'fill_auth_details',
-           description: 'Fill auth form.',
-           parameters: {
-             type: Type.OBJECT,
-             properties: {
-               phone: { type: Type.STRING },
-               username: { type: Type.STRING },
-               pin: { type: Type.STRING }
-             }
-           }
-         }
-       ]
+           description: 'Auto-fill login/signup.',
+           parameters: { type: Type.OBJECT, properties: { phone: { type: Type.STRING }, username: { type: Type.STRING }, pin: { type: Type.STRING } } }
+       }];
     } else {
-      systemInstruction = `${ghanaianPersona} Help students find rides. Confirm or fill_ride_form.`;
-      tools = [
-        { 
+      systemInstruction = `${ghanaianPersona} Student portal. Tools: fill_ride_form, confirm_ride.`;
+      tools = [{ 
           name: 'fill_ride_form', 
-          description: 'Fill request.',
-          parameters: {
-             type: Type.OBJECT,
-             properties: { 
-               origin: { type: Type.STRING },
-               destination: { type: Type.STRING },
-               vehicleType: { type: Type.STRING, enum: ['Pragia', 'Taxi', 'Shuttle'] },
-               isSolo: { type: Type.BOOLEAN }
-             },
-             required: ['destination']
-          }
-        },
-        { name: 'confirm_ride', description: 'Submit request.' }
-      ];
+          description: 'Fill booking details.',
+          parameters: { type: Type.OBJECT, properties: { origin: { type: Type.STRING }, destination: { type: Type.STRING }, vehicleType: { type: Type.STRING, enum: ['Pragia', 'Taxi', 'Shuttle'] }, isSolo: { type: Type.BOOLEAN } }, required: ['destination'] }
+        }, { name: 'confirm_ride', description: 'Press book button.' }];
     }
 
     try {
       const inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      
+      // CRITICAL: Explicitly resume on user gesture
+      await inputAudioContext.resume();
+      await outputAudioContext.resume();
+      
       audioContextRef.current = outputAudioContext;
       inputAudioContextRef.current = inputAudioContext;
+      nextStartTimeRef.current = 0; // Reset cursor
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const inputNode = inputAudioContext.createMediaStreamSource(stream);
@@ -198,18 +182,15 @@ export const GlobalVoiceOrb = ({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         config: {
           responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
-          },
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
           systemInstruction,
           tools: [{ functionDeclarations: tools }],
-          // CRITICAL: Disable thinking budget for ultra-low latency response
           thinkingConfig: { thinkingBudget: 0 } 
         },
         callbacks: {
           onopen: () => {
-            console.log("Gemini Live Connected");
             setState('listening');
+            vibrate(50); // Ready to listen pulse
             scriptProcessor.onaudioprocess = (e) => {
               const inputData = e.inputBuffer.getChannelData(0);
               const pcmBlob = createBlob(inputData);
@@ -221,16 +202,26 @@ export const GlobalVoiceOrb = ({
           onmessage: async (msg: LiveServerMessage) => {
             const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audioData) {
-              if (state !== 'speaking') vibrate(30); // Haptic feedback when AI starts talking
-              setState('speaking');
+              if (state !== 'speaking') {
+                  vibrate(40); // Model starting to speak haptic
+                  setState('speaking');
+              }
+              
               const buffer = await decodeAudioData(decode(audioData), outputAudioContext, 24000, 1);
-              nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputAudioContext.currentTime);
+              
+              // CRITICAL: Cursor sync fix
+              const now = outputAudioContext.currentTime;
+              if (nextStartTimeRef.current < now) {
+                  nextStartTimeRef.current = now + 0.05; // Add small buffer to prevent clipping
+              }
+              
               const source = outputAudioContext.createBufferSource();
               source.buffer = buffer;
               source.connect(outputAudioContext.destination);
               source.start(nextStartTimeRef.current);
               nextStartTimeRef.current += buffer.duration;
               sourcesRef.current.add(source);
+              
               source.onended = () => {
                 sourcesRef.current.delete(source);
                 if (sourcesRef.current.size === 0) setState('listening');
@@ -238,9 +229,9 @@ export const GlobalVoiceOrb = ({
             }
 
             if (msg.serverContent?.interrupted) {
-               sourcesRef.current.forEach(s => s.stop());
+               sourcesRef.current.forEach(s => { try { s.stop(); } catch(e) {} });
                sourcesRef.current.clear();
-               nextStartTimeRef.current = 0;
+               nextStartTimeRef.current = outputAudioContext.currentTime; // Sync immediately on break
                setState('listening');
                vibrate(10);
             }
@@ -248,8 +239,8 @@ export const GlobalVoiceOrb = ({
             if (msg.toolCall) {
               const session = await sessionPromise;
               for (const fc of msg.toolCall.functionCalls) {
-                 vibrate(20); // Small pulse for tool action
-                 let result: any = { result: "Done" };
+                 vibrate(25);
+                 let result: any = { result: "OK" };
                  const cleanArgs = (args: any) => {
                     const clean: any = {};
                     for (const key in args) if (args[key] !== undefined && args[key] !== null) clean[key] = args[key];
@@ -257,35 +248,31 @@ export const GlobalVoiceOrb = ({
                  };
                  
                  if (fc.name === 'update_status' && actions.onUpdateStatus) {
-                    const s = (fc.args as any).status;
-                    actions.onUpdateStatus(s);
-                    result = { result: `Status is now ${s}` };
+                    actions.onUpdateStatus((fc.args as any).status);
                  } else if (fc.name === 'check_wallet') {
-                    result = { result: `Balance: ${user?.walletBalance || 0} cedis.` };
+                    result = { result: `Wallet balance is ${user?.walletBalance || 0} cedis.` };
                  } else if (fc.name === 'get_revenue_report') {
                      const total = contextData.transactions?.reduce((a, b) => a + b.amount, 0) || 0;
-                     result = { result: `Revenue: ${total.toFixed(2)}.` };
+                     result = { result: `Platform revenue: ₵${total.toFixed(2)}.` };
                  } else if (fc.name === 'system_health_check') {
-                     result = { result: `Drivers: ${contextData.drivers.length}. Rides: ${contextData.nodes.length}.` };
+                     result = { result: `${contextData.drivers.length} drivers, ${contextData.nodes.length} rides.` };
                  } else if (fc.name === 'fill_ride_form' && actions.onFillRideForm) {
                      actions.onFillRideForm(cleanArgs(fc.args));
-                     result = { result: "Updated." };
                  } else if (fc.name === 'confirm_ride' && actions.onConfirmRide) {
                      actions.onConfirmRide();
-                     result = { result: "Requested." };
                  } else if (fc.name === 'fill_auth_details' && actions.onFillAuth) {
                      actions.onFillAuth(cleanArgs(fc.args));
-                     result = { result: "Form updated." };
                  }
 
-                 session.sendToolResponse({
-                    functionResponses: { id: fc.id, name: fc.name, response: result }
-                 });
+                 session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: result } });
               }
             }
           },
-          onclose: () => setIsActive(false),
-          onerror: (e) => {
+          onclose: () => {
+              setIsActive(false);
+              vibrate(10);
+          },
+          onerror: () => {
              setState('error');
              vibrate([100, 50, 100]);
              setTimeout(() => setIsActive(false), 2000);
@@ -294,6 +281,7 @@ export const GlobalVoiceOrb = ({
       });
       sessionRef.current = sessionPromise;
     } catch (e: any) {
+      console.error("AI Bridge Failed", e);
       setState('error');
       vibrate([100, 50, 100]);
       setTimeout(() => setIsActive(false), 2000);
@@ -311,7 +299,7 @@ export const GlobalVoiceOrb = ({
     <>
       <button 
         onClick={toggleSession}
-        className={`fixed bottom-24 left-6 lg:bottom-12 lg:left-12 z-[500] w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all ${isActive ? 'bg-rose-500 scale-110 animate-pulse' : `bg-gradient-to-tr ${getOrbColor()}`}`}
+        className={`fixed bottom-24 left-6 lg:bottom-12 lg:left-12 z-[500] w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all ${isActive ? 'bg-rose-500 scale-110' : `bg-gradient-to-tr ${getOrbColor()}`}`}
       >
         <i className={`fas ${isActive ? 'fa-microphone-slash' : 'fa-microphone'} text-white text-2xl`}></i>
       </button>
@@ -321,13 +309,13 @@ export const GlobalVoiceOrb = ({
            <canvas ref={canvasRef} width={400} height={400} className="w-[300px] h-[300px] sm:w-[400px] sm:h-[400px]" />
            <div className="mt-8 text-center px-4">
               <h3 className="text-2xl font-black italic uppercase text-white tracking-widest animate-pulse">
-                {state === 'connecting' ? 'Link Start...' : state === 'listening' ? 'Mepaakyɛw...' : state === 'speaking' ? 'Kofi AI' : '...'}
+                {state === 'connecting' ? 'SYNCING...' : state === 'listening' ? 'Kofi Listening' : state === 'speaking' ? 'Kofi AI' : '...'}
               </h3>
-              <p className="text-xs font-bold opacity-70 uppercase mt-2 tracking-[0.2em]" style={{ color: mode === 'admin' ? '#f43f5e' : '#94a3b8' }}>
-                Ultra-Low Latency Mode Active
+              <p className="text-xs font-bold text-indigo-400 uppercase mt-2 tracking-[0.2em]">
+                {state === 'speaking' ? 'Model Responding' : 'Real-time Voice Active'}
               </p>
            </div>
-           <button onClick={toggleSession} className="mt-12 px-8 py-3 bg-white/10 rounded-full text-white font-black uppercase text-xs hover:bg-white/20 transition-all">End Call</button>
+           <button onClick={toggleSession} className="mt-12 px-8 py-3 bg-white/10 rounded-full text-white font-black uppercase text-xs hover:bg-white/20 transition-all border border-white/10">End Call</button>
         </div>
       )}
     </>
