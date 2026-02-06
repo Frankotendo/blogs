@@ -1,0 +1,21 @@
+{
+  "name": "NexRyde Dispatch",
+  "short_name": "NexRyde",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#f59e0b",
+  "description": "Premium campus logistics platform with secure partner onboarding, ride pooling, and marketplace hubs.",
+  "icons": [
+    {
+      "src": "https://api.dicebear.com/7.x/shapes/svg?seed=nexryde&backgroundColor=f59e0b",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "https://api.dicebear.com/7.x/shapes/svg?seed=nexryde&backgroundColor=f59e0b",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
