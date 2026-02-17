@@ -92,7 +92,7 @@ const App: React.FC = () => {
         { data: trData },
         { data: regData }
       ] = await Promise.all([
-        supabase.from('unihub_settings').select('*').single(),
+        supabase.from('unihub_settings').select('*').eq('id', 1).maybeSingle(),
         supabase.from('unihub_nodes').select('*').order('createdAt', { ascending: false }),
         supabase.from('unihub_drivers').select('*'),
         supabase.from('unihub_missions').select('*').order('createdat', { ascending: false }),
@@ -102,29 +102,34 @@ const App: React.FC = () => {
       ]);
 
       if (sData) {
-        // SQL schema has both camelCase and snake_case variants for several fields.
-        // We prioritize camelCase but check snake_case as fallback.
-        const mappedSettings: AppSettings = {
-            ...settings, 
-            ...sData, 
-            adminMomo: sData.adminMomo || sData.admin_momo || settings.adminMomo,
-            adminMomoName: sData.adminMomoName || sData.admin_momo_name || settings.adminMomoName,
-            whatsappNumber: sData.whatsappNumber || sData.whatsapp_number || settings.whatsappNumber,
-            commissionPerSeat: sData.commissionPerSeat || sData.commission_per_seat || settings.commissionPerSeat,
-            farePerPragia: sData.farePerPragia || sData.fare_per_pragia || settings.farePerPragia,
-            farePerTaxi: sData.farePerTaxi || sData.fare_per_taxi || settings.farePerTaxi,
-            soloMultiplier: sData.soloMultiplier || sData.solo_multiplier || settings.soloMultiplier,
+        // Map strictly to the columns that exist in the SQL schema provided
+        setSettings({
+            ...settings,
+            id: Number(sData.id),
+            adminMomo: sData.adminMomo || settings.adminMomo,
+            adminMomoName: sData.adminMomoName || settings.adminMomoName,
+            whatsappNumber: sData.whatsappNumber || settings.whatsappNumber,
+            commissionPerSeat: Number(sData.commissionPerSeat) || settings.commissionPerSeat,
+            farePerPragia: Number(sData.farePerPragia) || settings.farePerPragia,
+            farePerTaxi: Number(sData.farePerTaxi) || settings.farePerTaxi,
+            soloMultiplier: Number(sData.soloMultiplier) || settings.soloMultiplier,
             aboutMeText: sData.aboutMeText || sData.about_me_text || settings.aboutMeText,
-            aboutMeImages: sData.aboutMeImages || sData.about_me_images || [],
+            aboutMeImages: sData.aboutMeImages || [],
             appWallpaper: sData.appWallpaper || sData.app_wallpaper || "",
-            appLogo: sData.appLogo || sData.app_logo || "",
-            registrationFee: sData.registrationFee || sData.registration_fee || settings.registrationFee
-        };
-        setSettings(mappedSettings);
+            appLogo: sData.appLogo || "",
+            registrationFee: Number(sData.registrationFee || sData.registration_fee) || settings.registrationFee,
+            hub_announcement: sData.hub_announcement || "",
+            facebookUrl: sData.facebookUrl || "",
+            instagramUrl: sData.instagramUrl || "",
+            tiktokUrl: sData.tiktokUrl || "",
+            adSenseClientId: sData.adSenseClientId || "",
+            adSenseSlotId: sData.adSenseSlotId || "",
+            adSenseStatus: sData.adSenseStatus || "inactive",
+            shuttleCommission: Number(sData.shuttleCommission) || 0
+        });
       }
       
       if (nData) {
-          // In SQL schema, unihub_nodes has both vehicleType and vehicle_type.
           const normalizedNodes = nData.map((n: any) => ({
               ...n,
               vehicleType: n.vehicleType || n.vehicle_type || 'Pragia'
@@ -133,7 +138,6 @@ const App: React.FC = () => {
       }
       
       if (dData) {
-          // SQL unihub_drivers has avatarUrl and avatar_url
           const normalizedDrivers = dData.map((d: any) => ({
               ...d,
               avatarUrl: d.avatarUrl || d.avatar_url || ''
@@ -142,7 +146,6 @@ const App: React.FC = () => {
       }
       
       if (mData) {
-          // unihub_missions has driversjoined and createdat (lowercase)
           const normalizedMissions = mData.map((m: any) => ({
               ...m,
               driversJoined: m.driversjoined || [],
@@ -222,41 +225,42 @@ const App: React.FC = () => {
   
   const updateGlobalSettings = async (newSettings: AppSettings) => {
     const { id, ...data } = newSettings;
-    // Map to DB columns exactly as they appear in SQL schema, using camelCase primary keys but updating snake_case shadows if they exist
-    const dbData = {
+    // Map strictly to valid columns found in the SQL schema provided. 
+    // Do NOT include admin_momo or other snake_case variants if they were missing in SQL.
+    const dbData: any = {
       adminMomo: data.adminMomo,
-      admin_momo: data.adminMomo,
       adminMomoName: data.adminMomoName,
-      admin_momo_name: data.adminMomoName,
       whatsappNumber: data.whatsappNumber,
-      whatsapp_number: data.whatsappNumber,
       commissionPerSeat: data.commissionPerSeat,
-      commission_per_seat: data.commissionPerSeat,
-      shuttleCommission: data.shuttleCommission,
-      shuttle_commission: data.shuttleCommission,
       farePerPragia: data.farePerPragia,
-      fare_per_pragia: data.farePerPragia,
       farePerTaxi: data.farePerTaxi,
-      fare_per_taxi: data.farePerTaxi,
       soloMultiplier: data.soloMultiplier,
-      solo_multiplier: data.soloMultiplier,
       aboutMeText: data.aboutMeText,
-      about_me_text: data.aboutMeText,
+      about_me_text: data.aboutMeText, // shadow column
       aboutMeImages: data.aboutMeImages,
-      about_me_images: data.aboutMeImages,
       appWallpaper: data.appWallpaper,
-      app_wallpaper: data.appWallpaper,
-      appLogo: data.appLogo,
+      app_wallpaper: data.appWallpaper, // shadow column
       registrationFee: data.registrationFee,
-      registration_fee: data.registrationFee,
+      registration_fee: data.registrationFee, // shadow column
       hub_announcement: data.hub_announcement,
+      appLogo: data.appLogo,
+      shuttleCommission: data.shuttleCommission,
+      facebookUrl: data.facebookUrl,
+      instagramUrl: data.instagramUrl,
+      tiktokUrl: data.tiktokUrl,
       adSenseClientId: data.adSenseClientId,
       adSenseSlotId: data.adSenseSlotId,
       adSenseStatus: data.adSenseStatus
     };
 
     const { error } = await supabase.from('unihub_settings').upsert({ id: id || 1, ...dbData });
-    if (error) alert("Sync Error: " + error.message); else alert("Settings Synced!");
+    if (error) {
+        console.error("Supabase Settings Error:", error);
+        alert("Sync Error: " + error.message);
+    } else {
+        alert("Settings Synced!");
+        fetchData();
+    }
   };
 
   const handleAdminAuth = async (email: string, pass: string) => {
