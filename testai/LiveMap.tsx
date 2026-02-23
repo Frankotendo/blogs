@@ -244,6 +244,10 @@ const LiveMap: React.FC<LiveMapProps> = ({
           zoom={zoom}
           style={{ height: '100%', width: '100%' }}
           zoomControl={true}
+          scrollWheelZoom={true}
+          doubleClickZoom={true}
+          dragging={true}
+          touchZoom={true}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

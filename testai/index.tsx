@@ -18,6 +18,7 @@ import { createClient } from "@supabase/supabase-js";
 import LiveMap from './LiveMap';
 import MapContainerWrapper from './MapContainer';
 import AdminTools from './AdminTools';
+import RouteDirections from './RouteDirections';
 
 // --- SUPABASE CLIENT ---
 const SUPABASE_URL = "https://kzjgihwxiaeqzopeuzhm.supabase.co";
@@ -2767,6 +2768,14 @@ const DriverPortal = ({
 
       {activeTab === "active" && (
         <div className="space-y-4">
+          {/* Route Directions for Driver */}
+          {activeDriver && (
+            <RouteDirections 
+              driverId={activeDriver.id} 
+              className="w-full"
+            />
+          )}
+          
           {myActiveRides.length === 0 && (
             <p className="text-center text-slate-600 py-8 text-xs font-bold uppercase">
               No active trips.
