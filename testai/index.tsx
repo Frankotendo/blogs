@@ -16,6 +16,10 @@ import {
 } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 
+// NEW CODE START
+import LiveMap from "./components/LiveMap";
+// NEW CODE END
+
 // --- SUPABASE CLIENT ---
 const SUPABASE_URL = "https://kzjgihwxiaeqzopeuzhm.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -1815,6 +1819,23 @@ const PassengerPortal = ({
         </div>
       )}
 
+      // NEW CODE START
+      {/* Live Map for Real-time Driver Tracking */}
+      <div className="space-y-4">
+        <h3 className="text-xs font-black uppercase text-slate-500 tracking-widest px-2">
+          Live Driver Map
+        </h3>
+        <LiveMap 
+          mode="passenger"
+          userLocation={{ lat: 5.6037, lng: -0.18696 }} // Default: Kumasi, Ghana
+          onDriverSelect={(driver) => {
+            console.log('Selected driver:', driver);
+          }}
+          className="glass rounded-[2rem] border border-white/10 overflow-hidden"
+        />
+      </div>
+      // NEW CODE END
+
       <div
         onClick={() => setCreateMode(true)}
         className="glass p-8 rounded-[2.5rem] border-2 border-dashed border-white/10 hover:border-amber-500/50 cursor-pointer group transition-all text-center space-y-2"
@@ -2608,6 +2629,27 @@ const DriverPortal = ({
           )}
         </button>
       </div>
+
+      // NEW CODE START
+      {/* Live Map for Driver Navigation */}
+      {activeTab === "active" && myActiveRides.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-xs font-black uppercase text-slate-500 tracking-widest px-2">
+            Navigation to Passenger
+          </h3>
+          {myActiveRides.map((ride: any) => (
+            <div key={ride.id} className="space-y-2">
+              <LiveMap 
+                mode="driver"
+                userLocation={{ lat: 5.6037, lng: -0.18696 }} // Driver location (mock)
+                destination={{ lat: 5.6137, lng: -0.17696 }} // Passenger pickup location (mock)
+                className="glass rounded-[2rem] border border-white/10 overflow-hidden"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      // NEW CODE END
 
       {activeTab === "market" && (
         <div className="space-y-6">
