@@ -61,6 +61,16 @@ class RoleBasedNotificationManager {
     
     // Driver-specific notifications (only shown to drivers)
     notifyDriver(message, driverId = null) {
+        // Only show if current user is a driver
+        if (trackingState.currentUserRole !== enhancedConfig.userRoles.DRIVER) {
+            return false;
+        }
+        
+        // Only show if specific recipient matches current driver
+        if (driverId && this.getCurrentDriverId() !== driverId) {
+            return false;
+        }
+        
         return this.sendNotification(
             `🚗 Driver: ${message}`, 
             'driver', 
@@ -176,6 +186,14 @@ class RoleBasedNotificationManager {
         return trackingState.currentUserRole === enhancedConfig.userRoles.DRIVER ? 
             trackingState.activeTrip?.driverId : 
             'current_user';
+    }
+    
+    getCurrentDriverId() {
+        // Get current driver ID based on role and active trip
+        if (trackingState.currentUserRole === enhancedConfig.userRoles.DRIVER) {
+            return trackingState.activeTrip?.driverId || 'current_driver';
+        }
+        return null;
     }
     
     clearNotifications(tripId = null) {
