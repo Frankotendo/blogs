@@ -56,6 +56,34 @@
         }
     };
     
+    // Load Leaflet manually if CDN fails
+    function loadLeafletManually() {
+        console.log('🔧 Attempting to load Leaflet manually...');
+        
+        // Create Leaflet CSS
+        const leafletCSS = document.createElement('link');
+        leafletCSS.rel = 'stylesheet';
+        leafletCSS.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(leafletCSS);
+        
+        // Create Leaflet JS
+        const leafletJS = document.createElement('script');
+        leafletJS.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        leafletJS.onload = () => {
+            console.log('✅ Leaflet loaded manually');
+            setTimeout(() => {
+                initMap();
+                requestLocationPermission();
+                startDriverSimulation();
+            }, 1000);
+        };
+        leafletJS.onerror = () => {
+            console.error('❌ Manual Leaflet loading failed');
+            showNotification('❌ Unable to load map - Check internet connection');
+        };
+        document.head.appendChild(leafletJS);
+    }
+    
     // Initialize the tracking system
     function initTracking() {
         console.log('🚀 Initializing UniHub Enhanced Tracking...');
@@ -67,50 +95,61 @@
         // Create UI elements
         createUI();
         
-        // Wait for Leaflet to be available
-        if (typeof L === 'undefined') {
-            setTimeout(initTracking, 500);
-            return;
+        // Wait for Leaflet to be available with timeout
+        let leafletAttempts = 0;
+        const maxAttempts = 20;
+        
+        function tryInitMap() {
+            leafletAttempts++;
+            console.log(`🗺️ Checking for Leaflet... Attempt ${leafletAttempts}/${maxAttempts}`);
+            
+            if (typeof L !== 'undefined') {
+                console.log('✅ Leaflet loaded, initializing map...');
+                initMap();
+                requestLocationPermission();
+                startDriverSimulation();
+                console.log('✅ Enhanced Tracking initialized');
+            } else if (leafletAttempts < maxAttempts) {
+                console.log('⏳ Leaflet not yet loaded, waiting...');
+                setTimeout(tryInitMap, 500);
+            } else {
+                console.error('❌ Leaflet failed to load after maximum attempts');
+                showNotification('❌ Map loading failed - Please refresh the page');
+                // Try to load Leaflet manually
+                loadLeafletManually();
+            }
         }
         
-        // Initialize map
-        initMap();
-        
-        // Request location permission
-        requestLocationPermission();
-        
-        // Start driver simulation
-        startDriverSimulation();
-        
-        console.log('✅ Enhanced Tracking initialized');
+        tryInitMap();
     }
     
     // Create UI elements
     function createUI() {
         // Create mobile toggle button
-        if (isMobile) {
-            const mobileToggle = document.createElement('button');
-            mobileToggle.id = 'mobile-map-toggle';
-            mobileToggle.innerHTML = '🗺️ Show Map';
-            mobileToggle.style.cssText = `
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                background: #3b82f6;
-                color: white;
-                border: none;
-                padding: 12px 20px;
-                border-radius: 25px;
-                font-size: 14px;
-                font-weight: 600;
-                box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-                z-index: 10001;
-                cursor: pointer;
-                transition: all 0.3s ease;
-            `;
-            mobileToggle.onclick = toggleMobileMap;
-            document.body.appendChild(mobileToggle);
-        }
+        const mobileToggle = document.createElement('button');
+        mobileToggle.id = 'mobile-map-toggle';
+        mobileToggle.innerHTML = '🗺️ Show Map';
+        mobileToggle.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            z-index: 10001;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        `;
+        mobileToggle.onclick = () => {
+            console.log('🗺️ Toggle clicked');
+            toggleMobileMap();
+        };
+        document.body.appendChild(mobileToggle);
         
         // Create vehicle type filter
         const vehicleFilter = document.createElement('div');
@@ -119,10 +158,10 @@
             <div style="background: rgba(15, 23, 42, 0.95); border: 1px solid #334155; border-radius: 12px; padding: 15px; margin: 10px 0; backdrop-filter: blur(10px);">
                 <h4 style="color: #f8fafc; margin: 0 0 10px 0; font-size: 14px; font-weight: 600;">🚗 Select Vehicle Type</h4>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button onclick="filterByVehicle('all')" style="background: #64748b; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">All</button>
-                    <button onclick="filterByVehicle('taxi')" style="background: #fbbf24; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">🚕 Taxi</button>
-                    <button onclick="filterByVehicle('shuttle')" style="background: #3b82f6; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">🚌 Shuttle</button>
-                    <button onclick="filterByVehicle('pragia')" style="background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">🏍️ Pragia</button>
+                    <button onclick="window.UniHubTracking.filterByVehicle('all')" style="background: #64748b; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">All</button>
+                    <button onclick="window.UniHubTracking.filterByVehicle('taxi')" style="background: #fbbf24; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">🚕 Taxi</button>
+                    <button onclick="window.UniHubTracking.filterByVehicle('shuttle')" style="background: #3b82f6; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">🚌 Shuttle</button>
+                    <button onclick="window.UniHubTracking.filterByVehicle('pragia')" style="background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">🏍️ Pragia</button>
                 </div>
                 <div id="vehicle-stats" style="margin-top: 10px; font-size: 12px; color: #94a3b8;"></div>
             </div>
@@ -261,9 +300,14 @@
         const mapContainer = document.getElementById('map');
         const toggle = document.getElementById('mobile-map-toggle');
         
-        if (!mapContainer || !toggle) return;
+        if (!mapContainer || !toggle) {
+            console.error('❌ Map container or toggle not found');
+            return;
+        }
         
         mapVisible = !mapVisible;
+        
+        console.log('🗺️ Toggling map:', mapVisible ? 'show' : 'hide');
         
         if (mapVisible) {
             mapContainer.style.display = 'block';
@@ -349,38 +393,81 @@
             mapContainer.style.width = '100%';
             mapContainer.style.border = '1px solid #334155';
             mapContainer.style.borderRadius = '8px';
-            mapContainer.style.background = '#0f172a';
+            mapContainer.style.background = '#e2e8f0'; // Light gray background
             mapContainer.style.position = 'relative';
             mapContainer.style.zIndex = '100';
             
-            // Hide map on mobile by default
+            // Show map by default on desktop, hide on mobile
             if (isMobile && !mapVisible) {
                 mapContainer.style.display = 'none';
+            } else {
+                mapContainer.style.display = 'block';
             }
             
-            // Create map instance
-            map = L.map('map', {
-                center: config.mapCenter,
-                zoom: config.defaultZoom,
-                zoomControl: true,
-                attributionControl: true
-            });
+            // Create map instance with error handling
+            try {
+                map = L.map('map', {
+                    center: config.mapCenter,
+                    zoom: config.defaultZoom,
+                    zoomControl: true,
+                    attributionControl: true,
+                    worldCopyJump: true
+                });
+                
+                console.log('✅ Map instance created');
+            } catch (mapError) {
+                console.error('❌ Map creation failed:', mapError);
+                showNotification('❌ Map initialization failed');
+                return;
+            }
             
-            // Add OpenStreetMap tiles
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors',
-                maxZoom: config.maxZoom
-            }).addTo(map);
+            // Add OpenStreetMap tiles with error handling
+            try {
+                const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: config.maxZoom,
+                    errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+                    tileSize: 256,
+                    detectRetina: true
+                });
+                
+                tileLayer.on('tileerror', function(e) {
+                    console.warn('⚠️ Tile loading error:', e);
+                });
+                
+                tileLayer.on('tileload', function(e) {
+                    console.log('✅ Tile loaded:', e.tile.src);
+                });
+                
+                tileLayer.addTo(map);
+                console.log('✅ Tile layer added successfully');
+                
+            } catch (tileError) {
+                console.error('❌ Tile layer failed:', tileError);
+                showNotification('❌ Map tiles failed to load');
+                return;
+            }
             
             // Enable map interactions
             map.on('click', function(e) {
                 console.log('🗺️ Map clicked at:', e.latlng);
+                showNotification(`🗺️ Map clicked: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
+            });
+            
+            map.on('zoomend', function() {
+                console.log('🔍 Map zoom level:', map.getZoom());
+            });
+            
+            map.on('load', function() {
+                console.log('✅ Map fully loaded');
+                showNotification('🗺️ Map loaded successfully');
             });
             
             console.log('🗺️ Map initialized successfully');
             
         } catch (error) {
             console.error('❌ Failed to initialize map:', error);
+            showNotification('❌ Map initialization failed - Please refresh');
         }
     }
     
