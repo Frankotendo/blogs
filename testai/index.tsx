@@ -7,6 +7,8 @@ import React, {
 } from "react";
 import ReactDOM from "react-dom/client";
 import TrackingComponent from "./TrackingComponent";
+import SocialMediaMarketing from "./SocialMediaMarketing";
+import EnhancedDemandAI from "./EnhancedDemandAI";
 import {
   GoogleGenAI,
   Type,
@@ -3215,12 +3217,6 @@ const AdminPortal = ({
   const [localSettings, setLocalSettings] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Marketing / Flyer + Advertising Strategy
-  const [flyerBrief, setFlyerBrief] = useState("");
-  const [flyerStrategy, setFlyerStrategy] = useState<string | null>(null);
-  const [flyerCopy, setFlyerCopy] = useState<{ headline: string; subhead: string; cta: string } | null>(null);
-  const [isGeneratingFlyer, setIsGeneratingFlyer] = useState(false);
-
   // Pulse
   const [pulseAnalysis, setPulseAnalysis] = useState<any>(null);
   const [isAnalyzingPulse, setIsAnalyzingPulse] = useState(false);
@@ -3277,133 +3273,6 @@ const AdminPortal = ({
       ...localSettings,
       aboutMeImages: [...(localSettings.aboutMeImages || []), ...newImages],
     });
-  };
-
-  const handleGenerateFlyer = async () => {
-    if (!flyerBrief.trim()) return;
-
-    setIsGeneratingFlyer(true);
-    setFlyerStrategy(null);
-    setFlyerCopy(null);
-    try {
-      const flyerAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const strategyPrompt = `
-You are an expert direct-response copywriter. Create high-converting flyer copy that sells.
-
-Rules:
-- Headline: benefit-driven or curiosity hook, max 6–8 words. Use power words (Save, Now, Free, Easy, Best, Join).
-- Subhead: expand the benefit, add urgency or social proof, max 12–18 words.
-- Cta: single strong action verb + optional urgency (e.g. "Book Now", "Get 20% Off Today").
-
-Campaign brief: ${flyerBrief}
-
-Respond with JSON only: { "strategy": "2–4 sentence strategy: target audience, key message, channels.", "headline": "...", "subhead": "...", "cta": "..." }
-`;
-
-      const response = await flyerAi.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: strategyPrompt,
-        config: { responseMimeType: "application/json" },
-      });
-
-      const text = response.text || "{}";
-      const parsed = JSON.parse(text);
-      setFlyerStrategy(parsed.strategy || "");
-      setFlyerCopy({
-        headline: parsed.headline || "Get Started",
-        subhead: parsed.subhead || "Your message here",
-        cta: parsed.cta || "Learn More",
-      });
-    } catch (err: any) {
-      console.error("Flyer Gen Error", err);
-      alert("Failed to generate strategy: " + (err.message || "Unknown error"));
-    } finally {
-      setIsGeneratingFlyer(false);
-    }
-  };
-
-  const downloadFlyerAsImage = () => {
-    if (!flyerCopy) return;
-    const w = 600;
-    const h = 800;
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const pad = 40;
-    const midX = w / 2;
-
-    // Gradient background
-    const grad = ctx.createLinearGradient(0, 0, w, h);
-    grad.addColorStop(0, "#4c1d95");
-    grad.addColorStop(0.5, "#3730a3");
-    grad.addColorStop(1, "#1e1b4b");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
-
-    // Border
-    ctx.strokeStyle = "rgba(251,191,36,0.4)";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(8, 8, w - 16, h - 16);
-
-    // Headline
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 28px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const headlineLines = flyerCopy.headline.split(/(?<=.{0,20})\s/).slice(0, 2);
-    headlineLines.forEach((line: string, i: number) => {
-      ctx.fillText(line, midX, 180 + i * 36);
-    });
-
-    // Subhead
-    ctx.fillStyle = "rgba(226,232,240,0.95)";
-    ctx.font = "16px system-ui, sans-serif";
-    const subWords = flyerCopy.subhead.split(" ");
-    let line = "";
-    let y = 300;
-    for (const word of subWords) {
-      const test = line ? line + " " + word : word;
-      const m = ctx.measureText(test);
-      if (m.width > w - pad * 2 && line) {
-        ctx.fillText(line, midX, y);
-        y += 22;
-        line = word;
-      } else line = test;
-    }
-    if (line) ctx.fillText(line, midX, y);
-
-    // CTA pill (rounded rect via path)
-    const ctaY = 480;
-    ctx.fillStyle = "#f59e0b";
-    const ctaW = Math.min(ctx.measureText(flyerCopy.cta).width + 48, w - 80);
-    const ctaX = (w - ctaW) / 2;
-    const r = 22;
-    ctx.beginPath();
-    ctx.moveTo(ctaX + r, ctaY - 22);
-    ctx.lineTo(ctaX + ctaW - r, ctaY - 22);
-    ctx.quadraticCurveTo(ctaX + ctaW, ctaY - 22, ctaX + ctaW, ctaY);
-    ctx.lineTo(ctaX + ctaW, ctaY + 22);
-    ctx.quadraticCurveTo(ctaX + ctaW, ctaY + 22, ctaX + ctaW - r, ctaY + 22);
-    ctx.lineTo(ctaX + r, ctaY + 22);
-    ctx.quadraticCurveTo(ctaX, ctaY + 22, ctaX, ctaY);
-    ctx.quadraticCurveTo(ctaX, ctaY - 22, ctaX + r, ctaY - 22);
-    ctx.fill();
-    ctx.fillStyle = "#020617";
-    ctx.font = "bold 14px system-ui, sans-serif";
-    ctx.fillText(flyerCopy.cta.toUpperCase(), midX, ctaY);
-
-    // Advertisement disclaimer at bottom
-    ctx.fillStyle = "rgba(148,163,184,0.9)";
-    ctx.font = "11px system-ui, sans-serif";
-    ctx.fillText("Advertisement", midX, h - 32);
-
-    const link = document.createElement("a");
-    link.download = `flyer-${flyerCopy.headline.slice(0, 20).replace(/\W/g, "-")}-${Date.now()}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
   };
 
   const handlePulseAnalysis = async () => {
@@ -3472,7 +3341,7 @@ Respond with JSON only: { "strategy": "2–4 sentence strategy: target audience,
           "rides",
           "finance",
           "missions",
-          "marketing",
+          "social media",
           "config",
         ].map((tab) => (
           <button
@@ -3486,146 +3355,11 @@ Respond with JSON only: { "strategy": "2–4 sentence strategy: target audience,
       </div>
 
       {activeTab === "monitor" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="glass p-6 rounded-[2rem] border border-white/5">
-              <p className="text-[9px] font-bold text-slate-500 uppercase">
-                Total Revenue
-              </p>
-              <p className="text-2xl font-black text-white">
-                ₵ {hubRevenue.toFixed(2)}
-              </p>
-            </div>
-            <div className="glass p-6 rounded-[2rem] border border-white/5">
-              <p className="text-[9px] font-bold text-slate-500 uppercase">
-                Active Drivers
-              </p>
-              <p className="text-2xl font-black text-emerald-400">
-                {drivers.filter((d: any) => d.status === "online").length} /{" "}
-                {drivers.length}
-              </p>
-            </div>
-            <div className="glass p-6 rounded-[2rem] border border-white/5">
-              <p className="text-[9px] font-bold text-slate-500 uppercase">
-                Active Rides
-              </p>
-              <p className="text-2xl font-black text-amber-500">
-                {nodes.filter((n: any) => n.status !== "completed").length}
-              </p>
-            </div>
-            <div className="glass p-6 rounded-[2rem] border border-white/5">
-              <p className="text-[9px] font-bold text-slate-500 uppercase">
-                Pending Regs
-              </p>
-              <p className="text-2xl font-black text-indigo-400">
-                {
-                  registrationRequests.filter(
-                    (r: any) => r.status === "pending",
-                  ).length
-                }
-              </p>
-            </div>
-          </div>
-
-          <div className="glass p-4 sm:p-8 rounded-2xl sm:rounded-[2rem] border border-white/10">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-              <h3 className="text-sm font-black text-white uppercase">
-                Market Pulse (AI)
-              </h3>
-              <button
-                onClick={handlePulseAnalysis}
-                disabled={isAnalyzingPulse}
-                className="w-full sm:w-auto px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase disabled:opacity-50 shrink-0"
-              >
-                {isAnalyzingPulse ? "Reasoning..." : "Analyze Supply/Demand"}
-              </button>
-            </div>
-            {pulseAnalysis && (
-              <div className="bg-white/5 p-4 rounded-xl border border-white/5 animate-in fade-in min-w-0 overflow-hidden">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <span
-                    className={`w-2 h-2 rounded-full shrink-0 ${pulseAnalysis.status === "Surge" ? "bg-rose-500 animate-pulse" : "bg-emerald-500"}`}
-                  ></span>
-                  <span className="text-sm font-black text-white uppercase">
-                    {pulseAnalysis.status}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300 mb-2 break-words">
-                  {pulseAnalysis.reason}
-                </p>
-                <p className="text-[10px] text-indigo-400 font-bold uppercase break-words">
-                  Suggestion: {pulseAnalysis.suggestedAction}
-                </p>
-              </div>
-            )}
-            <AdBanner settings={settings} className="mt-4 w-full max-w-md mx-auto" />
-          </div>
-        </div>
+        <EnhancedDemandAI nodes={nodes} drivers={drivers} settings={settings} />
       )}
 
-      {activeTab === "marketing" && (
-        <div className="glass p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-white/10 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h3 className="text-lg sm:text-xl font-black italic uppercase text-white">
-                Flyer Generator
-              </h3>
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">
-                Advertising Strategy AI
-              </p>
-            </div>
-            <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center text-white shadow-lg shrink-0">
-              <i className="fas fa-bullhorn"></i>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <textarea
-              value={flyerBrief}
-              onChange={(e) => setFlyerBrief(e.target.value)}
-              placeholder="Describe your campaign (e.g. Campus shuttle launch, back-to-school promo, weekend rides discount)..."
-              className="w-full min-h-[100px] sm:h-32 bg-white/5 border border-white/10 rounded-2xl p-4 text-white font-bold text-xs outline-none focus:border-purple-500 transition-colors resize-y"
-            />
-            <button
-              onClick={handleGenerateFlyer}
-              disabled={isGeneratingFlyer || !flyerBrief.trim()}
-              className="w-full py-4 bg-purple-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-500 transition-all"
-            >
-              {isGeneratingFlyer ? "Generating strategy & flyer copy..." : "Get strategy & generate flyer"}
-            </button>
-
-            {flyerStrategy && (
-              <div className="space-y-4 animate-in fade-in">
-                <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                  <p className="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-2">Advertising strategy</p>
-                  <p className="text-xs text-slate-300 leading-relaxed break-words">{flyerStrategy}</p>
-                </div>
-                {flyerCopy && (
-                  <div className="space-y-3">
-                    <div className="p-6 sm:p-8 bg-gradient-to-br from-purple-700/40 via-indigo-700/30 to-slate-900/50 rounded-2xl border border-amber-500/30 text-center relative overflow-hidden">
-                      <p className="text-[9px] font-black text-amber-400 uppercase tracking-widest mb-3">Flyer preview</p>
-                      <h4 className="text-lg sm:text-2xl font-black text-white uppercase mb-2 leading-tight max-w-md mx-auto">{flyerCopy.headline}</h4>
-                      <p className="text-xs sm:text-sm text-slate-300 mb-6 max-w-sm mx-auto leading-relaxed">{flyerCopy.subhead}</p>
-                      <span className="inline-block px-8 py-3 bg-amber-500 text-[#020617] rounded-2xl font-black text-[10px] sm:text-xs uppercase shadow-lg">
-                        {flyerCopy.cta}
-                      </span>
-                      <p className="text-[10px] text-slate-500 mt-6 font-medium">Advertisement</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={downloadFlyerAsImage}
-                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-colors"
-                    >
-                      <i className="fas fa-download"></i>
-                      Download flyer (PNG)
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            <AdBanner settings={settings} className="mt-4 w-full max-w-md mx-auto" />
-          </div>
-        </div>
+      {activeTab === "social media" && (
+        <SocialMediaMarketing />
       )}
 
       {activeTab === "drivers" && (
