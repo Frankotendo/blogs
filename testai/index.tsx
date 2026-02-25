@@ -4599,63 +4599,91 @@ const App: React.FC = () => {
 
     setIsSyncing(true);
     try {
-      const { data, error } = await supabase
-        .from("unihub_users")
-        .select("*")
-        .eq("phone", phone)
-        .maybeSingle();
+      // Get user IP for security tracking
+      const userIP = await fetch('https://api.ipify.org?format=json')
+        .then(res => res.json())
+        .then(data => data.ip)
+        .catch(() => '127.0.0.1');
+
+      const userAgent = navigator.userAgent;
 
       if (mode === "login") {
-        if (!data) {
-          alert("Profile not found! Please create an account first.");
+        // Use secure login function with rate limiting
+        const { data, error } = await supabase.rpc('secure_user_login', {
+          p_phone: phone,
+          p_pin: pin,
+          p_ip: userIP,
+          p_user_agent: userAgent
+        });
+
+        if (error) {
+          alert(`Login failed: ${error.message}`);
           setIsSyncing(false);
           return;
         }
 
-        const user = data as UniUser;
-
-        if (user.pin) {
-          if (user.pin !== pin) {
-            alert("Access Denied: Incorrect PIN.");
-            setIsSyncing(false);
-            return;
+        if (!data.success) {
+          // Handle different error types
+          if (data.code === 'RATE_LIMIT_EXCEEDED') {
+            alert("Too many login attempts. Please try again later.");
+          } else if (data.code === 'ACCOUNT_LOCKED') {
+            alert(`Account temporarily locked. Try again after ${new Date(data.locked_until).toLocaleString()}`);
+          } else {
+            alert(data.error || "Login failed. Please check your credentials.");
           }
-        } else {
-          await supabase.from("unihub_users").update({ pin }).eq("id", user.id);
-          user.pin = pin;
-          alert("Security Update: This PIN has been linked to your account.");
+          setIsSyncing(false);
+          return;
         }
+
+        // Successful login
+        const user = {
+          id: data.user_id,
+          username: data.username,
+          phone: phone,
+          pin: pin // Note: In production, don't store PIN in frontend
+        } as UniUser;
 
         setCurrentUser(user);
         localStorage.setItem("nexryde_user_v1", JSON.stringify(user));
+        alert("Login successful!");
       } else {
-        if (data) {
+        // Signup mode - check if user exists first
+        const { data: existingUser } = await supabase
+          .from("unihub_users")
+          .select("*")
+          .eq("phone", phone)
+          .maybeSingle();
+
+        if (existingUser) {
           alert("An account with this phone already exists! Please Sign In.");
           setIsSyncing(false);
           return;
         }
-        if (!username) {
-          alert("Please enter a username for your profile.");
+
+        // Create new user
+        const newUser = {
+          username,
+          phone,
+          pin, // In production, this should be hashed
+          created_at: new Date().toISOString()
+        };
+
+        const { error: insertErr } = await supabase
+          .from("unihub_users")
+          .insert([newUser]);
+
+        if (insertErr) {
+          alert(`Registration failed: ${insertErr.message}`);
           setIsSyncing(false);
           return;
         }
 
-        const newUser: UniUser = {
-          id: `USER-${Date.now()}`,
-          username,
-          phone,
-          pin,
-        };
-        const { error: insertErr } = await supabase
-          .from("unihub_users")
-          .insert([newUser]);
-        if (insertErr) throw insertErr;
-
-        setCurrentUser(newUser);
+        setCurrentUser(newUser as UniUser);
         localStorage.setItem("nexryde_user_v1", JSON.stringify(newUser));
+        alert("Account created successfully!");
       }
     } catch (err: any) {
-      alert("Identity Error: " + err.message);
+      alert(`Authentication error: ${err.message}`);
     } finally {
       setIsSyncing(false);
     }
@@ -5500,16 +5528,60 @@ const App: React.FC = () => {
     setSession(null);
   };
 
-  const handleDriverAuth = (driverId: string, pin: string) => {
-    const driver = drivers.find((d) => d.id === driverId);
-    if (driver && driver.pin === pin) {
-      setActiveDriverId(driverId);
-      sessionStorage.setItem("nexryde_driver_session_v1", driverId);
-      setViewMode("driver");
-    } else {
-      alert("Access Denied: Invalid Partner Password");
+  const handleDriverAuth = async (driverId: string, pin: string) => {
+  if (!driverId || !pin) {
+    alert("Driver ID and PIN are required.");
+    return;
+  }
+
+  setIsSyncing(true);
+  try {
+    // Get user IP for security tracking
+    const userIP = await fetch('https://api.ipify.org?format=json')
+      .then(res => res.json())
+      .then(data => data.ip)
+      .catch(() => '127.0.0.1');
+
+    const userAgent = navigator.userAgent;
+
+    // Use secure driver login function with rate limiting
+    const { data, error } = await supabase.rpc('secure_driver_login', {
+      p_driver_id: driverId,
+      p_pin: pin,
+      p_ip: userIP,
+      p_user_agent: userAgent
+    });
+
+    if (error) {
+      alert(`Login failed: ${error.message}`);
+      setIsSyncing(false);
+      return;
     }
-  };
+
+    if (!data.success) {
+      // Handle different error types
+      if (data.code === 'RATE_LIMIT_EXCEEDED') {
+        alert("Too many login attempts. Please try again later.");
+      } else if (data.code === 'ACCOUNT_LOCKED') {
+        alert(`Account temporarily locked. Try again after ${new Date(data.locked_until).toLocaleString()}`);
+      } else {
+        alert(data.error || "Login failed. Please check your credentials.");
+      }
+      setIsSyncing(false);
+      return;
+    }
+
+    // Successful login
+    setActiveDriverId(driverId);
+    sessionStorage.setItem("nexryde_driver_session_v1", driverId);
+    setViewMode("driver");
+    alert(`Welcome back, ${data.name}!`);
+  } catch (err: any) {
+    alert(`Authentication error: ${err.message}`);
+  } finally {
+    setIsSyncing(false);
+  }
+};
 
   const handleDriverLogout = () => {
     setActiveDriverId(null);
