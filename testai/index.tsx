@@ -6,6 +6,7 @@ import React, {
   useCallback,
 } from "react";
 import ReactDOM from "react-dom/client";
+import TrackingComponent from "./TrackingComponent";
 import {
   GoogleGenAI,
   Type,
@@ -81,7 +82,7 @@ function createBlob(data: Float32Array): { data: string; mimeType: string } {
 
 type VehicleType = "Pragia" | "Taxi" | "Shuttle";
 type NodeStatus = "forming" | "qualified" | "dispatched" | "completed";
-type PortalMode = "passenger" | "driver" | "admin" | "public";
+type PortalMode = "passenger" | "driver" | "admin" | "public" | "tracking";
 
 interface SearchConfig {
   query: string;
@@ -6036,13 +6037,18 @@ const App: React.FC = () => {
                     safeSetViewMode("admin");
                     setSearchConfig({ ...searchConfig, query: "" });
                   }}
-                  badge={
-                    isAdminAuthenticated && pendingRequestsCount > 0
-                      ? pendingRequestsCount
-                      : undefined
-                  }
+                  badge={pendingRequests > 0 ? pendingRequests : undefined}
                 />
               )}
+              <NavItem
+                active={viewMode === "tracking"}
+                icon="fa-location-dot"
+                label="GPS Tracking"
+                onClick={() => {
+                  safeSetViewMode("tracking");
+                  setSearchConfig({ ...searchConfig, query: "" });
+                }}
+              />
               <NavItem
                 active={false}
                 icon="fa-share-nodes"
@@ -6155,6 +6161,12 @@ const App: React.FC = () => {
                 }
               />
             )}
+            <MobileNavItem
+              active={viewMode === "tracking"}
+              icon="fa-location-dot"
+              label="Track"
+              onClick={() => safeSetViewMode("tracking")}
+            />
             <MobileNavItem
               active={showMenuModal}
               icon="fa-bars"
@@ -6282,23 +6294,23 @@ const App: React.FC = () => {
                   <AdminLogin onLogin={handleAdminAuth} />
                 ) : (
                   <AdminPortal
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
                     nodes={nodes}
-                    setNodes={setNodes}
                     drivers={drivers}
-                    onAddDriver={registerDriver}
-                    onDeleteDriver={deleteDriver}
-                    onCancelRide={cancelRide}
-                    onSettleRide={settleNode}
-                    missions={missions}
-                    onCreateMission={async (m: HubMission) => {
+                    onUpdateStatus={handleDriverStatusUpdate}
+                    onAcceptRide={handleAcceptRide}
+                    onTopupRequest={handleTopupRequest}
+                    onRegistrationRequest={handleRegistrationRequest}
+                    onTransaction={handleTransaction}
+                    currentUser={currentUser}
+                    settings={settings}
+                    onSettingsUpdate={handleSettingsUpdate}
+                    isLoading={isDriverLoading}
+                    onCreateMission={async (m: any) => {
                       const payload = {
-                        id: m.id,
+                        id: crypto.randomUUID(),
                         location: m.location,
                         description: m.description,
                         entryfee: m.entryFee,
-                        driversjoined: m.driversJoined,
                         status: m.status,
                         createdat: m.createdAt,
                       };
@@ -6319,12 +6331,12 @@ const App: React.FC = () => {
                     onRejectRegistration={rejectRegistration}
                     onLock={handleAdminLogout}
                     searchConfig={searchConfig}
-                    settings={settings}
                     onUpdateSettings={updateGlobalSettings}
                     hubRevenue={hubRevenue}
                     adminEmail={session?.user?.email}
                   />
                 ))}
+              {viewMode === "tracking" && <TrackingComponent />}
             </div>
           </main>
 
