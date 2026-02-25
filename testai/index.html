@@ -187,6 +187,11 @@
             let isMobile = window.innerWidth <= 768;
             let mapVisible = !isMobile;
             let activeMission = null;
+            let activeRoute = null;
+            let driverRoute = null;
+            let passengerRoute = null;
+            let routeControl = null;
+            let geocodedLocations = new Map(); // Cache for geocoded locations
             
             // Configuration
             const config = {
@@ -198,6 +203,13 @@
                     enableHighAccuracy: true,
                     timeout: 10000,
                     maximumAge: 0
+                },
+                routing: {
+                    profile: 'driving', // driving, walking, cycling
+                    alternatives: false,
+                    steps: true,
+                    annotations: true,
+                    overview: 'full'
                 },
                 vehicleTypes: {
                     taxi: { 
@@ -764,13 +776,20 @@
                 console.log('✅ Enhanced driver simulation started');
             }
             
-            // Update driver location with vehicle type
+            // Update driver location with vehicle type and georeferencing
             function updateDriverLocation(data) {
                 try {
                     const { id, lat, lng, vehicleType } = data;
                     
                     if (!id || typeof lat !== 'number' || typeof lng !== 'number') {
                         console.warn('⚠️ Invalid driver location data:', data);
+                        return;
+                    }
+                    
+                    // Georeference driver location
+                    const georeferencedLocation = georeferenceLocation(lat, lng, 'driver');
+                    if (!georeferencedLocation) {
+                        console.error('❌ Failed to georeference driver location');
                         return;
                     }
                     
@@ -782,29 +801,52 @@
                     // Get vehicle type info
                     const vehicle = config.vehicleTypes[vehicleType] || config.vehicleTypes.taxi;
                     
-                    // Create driver icon with vehicle type
+                    // Create driver icon with vehicle type and status indicator
                     const driverIcon = L.divIcon({
-                        html: `<div style="background: ${vehicle.color}; width: 28px; height: 28px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 14px;">${vehicle.icon}</div>`,
-                        iconSize: [28, 28],
-                        iconAnchor: [14, 14],
-                        popupAnchor: [0, -14]
+                        html: `<div style="background: ${vehicle.color}; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 16px; position: relative;">
+                            ${vehicle.icon}
+                            <div style="position: absolute; top: -2px; right: -2px; background: #10b981; width: 8px; height: 8px; border-radius: 50%; border: 1px solid white;"></div>
+                        </div>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16],
+                        popupAnchor: [0, -16]
                     });
                     
-                    // Add driver marker
+                    // Calculate distance to passenger
+                    const distanceToPassenger = passengerPosition ? 
+                        calculateDistance(lat, lng, passengerPosition.lat, passengerPosition.lng) : 
+                        null;
+                    
+                    const eta = distanceToPassenger ? 
+                        calculateETA(distanceToPassenger, vehicleType) : 
+                        null;
+                    
+                    // Add driver marker with enhanced popup
                     const marker = L.marker([lat, lng], { icon: driverIcon })
                         .bindPopup(`
-                            <div style="text-align: center;">
-                                <div style="font-size: 16px; margin-bottom: 5px;">${vehicle.icon} ${vehicle.name}</div>
-                                <div style="font-size: 12px; color: #64748b;">Driver ${id}</div>
-                                <div style="font-size: 12px; color: #10b981;">${vehicle.baseFare.toFixed(2)} GHS base fare</div>
-                                <div style="font-size: 12px; color: #64748b;">Capacity: ${vehicle.capacity} passengers</div>
-                                <button onclick="window.UniHubTracking.requestRide('${id}')" style="background: #3b82f6; color: white; border: none; padding: 5px 10px; border-radius: 4px; margin-top: 5px; cursor: pointer;">Request Ride</button>
+                            <div style="text-align: center; min-width: 200px;">
+                                <div style="font-size: 18px; margin-bottom: 8px;">${vehicle.icon} ${vehicle.name}</div>
+                                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Driver ${id}</div>
+                                <div style="font-size: 12px; color: #10b981; margin-bottom: 4px;">${vehicle.baseFare.toFixed(2)} GHS base fare</div>
+                                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Capacity: ${vehicle.capacity} passengers</div>
+                                ${distanceToPassenger ? `
+                                    <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; padding: 8px; margin: 8px 0;">
+                                        <div style="font-size: 11px; color: #3b82f6; margin-bottom: 2px;">📍 ${distanceToPassenger.toFixed(1)} km away</div>
+                                        <div style="font-size: 11px; color: #3b82f6;">⏱️ ${eta ? eta.formatted : 'Calculating...'}</div>
+                                    </div>
+                                ` : ''}
+                                <div style="font-size: 10px; color: #94a3b8; margin-bottom: 8px;">📍 ${georeferencedLocation.address || 'Location updating...'}</div>
+                                <button onclick="window.UniHubTracking.requestRide('${id}')" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; margin-top: 5px; cursor: pointer; width: 100%; font-weight: 600;">Request Ride</button>
                             </div>
                         `);
                     
-                    // Store driver marker with vehicle type
+                    // Store driver marker with enhanced metadata
                     marker.vehicleType = vehicleType;
                     marker._onMap = true;
+                    marker.georeferencedLocation = georeferencedLocation;
+                    marker.lastUpdate = Date.now();
+                    marker.distanceToPassenger = distanceToPassenger;
+                    marker.eta = eta;
                     drivers[id] = marker;
                     
                     // Apply filter if needed
@@ -813,15 +855,20 @@
                         marker._onMap = false;
                     }
                     
-                    console.log(`🚗 ${vehicle.name} ${id} updated: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                    // Update routes if this driver is on active mission
+                    if (activeMission && activeMission.driverId === id) {
+                        updateDriverRoute(id, passengerPosition);
+                    }
+                    
+                    console.log(`🚗 ${vehicle.name} ${id} updated: ${lat.toFixed(6)}, ${lng.toFixed(6)} (📍 ${georeferencedLocation.address || 'Unknown'})`);
                     
                 } catch (error) {
                     console.error('❌ Failed to update driver location:', error);
                 }
             }
             
-            // Request ride from specific driver
-            function requestRide(driverId) {
+            // Request ride from specific driver with route tracing
+            async function requestRide(driverId) {
                 const driver = drivers[driverId];
                 if (!driver) return;
                 
@@ -830,14 +877,108 @@
                 
                 console.log('🎯 Ride requested:', driverId, vehicle.name);
                 
+                // Clear any existing routes
+                clearRoutes();
+                
+                // Create active mission
+                activeMission = {
+                    driverId: driverId,
+                    passengerLocation: passengerPosition,
+                    driverLocation: { lat: driverPos.lat, lng: driverPos.lng },
+                    status: 'requested',
+                    requestTime: Date.now(),
+                    vehicleType: driver.vehicleType
+                };
+                
                 showNotification(`🚗 ${vehicle.name} requested! Driver ${driverId} is on the way.`);
                 
-                // Start driver navigation
-                startDriverNavigation(driverId, driverPos.lat, driverPos.lng);
+                // Start driver navigation with route tracing
+                await startDriverNavigationWithRoute(driverId, driverPos.lat, driverPos.lng);
                 
-                // Focus map on driver
-                if (map && driverPos) {
-                    map.setView([driverPos.lat, driverPos.lng], 15);
+                // Start passenger route tracing
+                await updatePassengerRoute(driverId);
+                
+                // Focus map to show both routes
+                if (map && driverPos && passengerPosition) {
+                    const bounds = L.latLngBounds([
+                        [driverPos.lat, driverPos.lng],
+                        [passengerPosition.lat, passengerPosition.lng]
+                    ]);
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
+            }
+            
+            // Enhanced driver navigation with route tracing
+            async function startDriverNavigationWithRoute(driverId, pickupLat, pickupLng) {
+                if (!passengerPosition) {
+                    console.warn('⚠️ No passenger position available');
+                    return;
+                }
+                
+                activeMission.status = 'dispatched';
+                activeMission.pickupLocation = { lat: pickupLat, lng: pickupLng };
+                
+                // Get and draw driver route
+                await updateDriverRoute(driverId, passengerPosition);
+                
+                // Show enhanced driver navigation panel
+                showDriverPanel(`
+                    <div style="text-align: center;">
+                        <h4 style="color: #10b981; margin: 0 0 15px 0;">🚗 Mission Active</h4>
+                        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                            <div style="font-size: 14px; margin-bottom: 5px;"><strong>Driver ${driverId}</strong></div>
+                            <div style="font-size: 12px; color: #94a3b8;">Status: <span style="color: #10b981;">En Route</span></div>
+                            <div style="font-size: 12px; color: #94a3b8;">Vehicle: ${config.vehicleTypes[drivers[driverId].vehicleType].icon} ${config.vehicleTypes[drivers[driverId].vehicleType].name}</div>
+                        </div>
+                        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                            <div style="font-size: 14px; margin-bottom: 8px;"><strong>🛣️ Route Information</strong></div>
+                            <div style="font-size: 12px; color: #94a3b8;" id="driver-route-info">Calculating route...</div>
+                        </div>
+                        <div style="font-size: 12px; color: #cbd5e1; margin-bottom: 15px;">
+                            <div>📍 Follow red route to passenger</div>
+                            <div>📞 Contact passenger when nearby</div>
+                            <div>✅ Confirm pickup on arrival</div>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="window.UniHubTracking.completeMission('${driverId}')" style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; flex: 1;">Complete Pickup</button>
+                            <button onclick="window.UniHubTracking.openGoogleMaps('${driverId}')" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; flex: 1;">🗺️ Maps</button>
+                        </div>
+                    </div>
+                `);
+                
+                // Open Google Maps for driver navigation
+                const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${pickupLat},${pickupLng}&destination=${passengerPosition.lat},${passengerPosition.lng}&travelmode=driving`;
+                console.log(`🗺️ Driver navigation: ${mapsUrl}`);
+            }
+            
+            // Update existing passenger location tracking to use enhanced version
+            function startPassengerTracking() {
+                if (!navigator.geolocation) {
+                    console.warn('⚠️ Geolocation not supported');
+                    updatePassengerLocationWithGeoreference(config.mapCenter[0], config.mapCenter[1], null);
+                    return;
+                }
+                
+                try {
+                    watchId = navigator.geolocation.watchPosition(
+                        function(position) {
+                            updatePassengerLocationWithGeoreference(
+                                position.coords.latitude, 
+                                position.coords.longitude, 
+                                position.coords.accuracy
+                            );
+                        },
+                        function(error) {
+                            console.error('📍 Geolocation error:', error);
+                            updatePassengerLocationWithGeoreference(config.mapCenter[0], config.mapCenter[1], null);
+                        },
+                        config.geolocationOptions
+                    );
+                    
+                    console.log('📍 Enhanced passenger tracking started');
+                } catch (error) {
+                    console.error('❌ Failed to start passenger tracking:', error);
+                    updatePassengerLocationWithGeoreference(config.mapCenter[0], config.mapCenter[1], null);
                 }
             }
             
@@ -990,6 +1131,370 @@
                 }
             }
             
+            // ===== GEOREFERENCING & ROUTING SYSTEM =====
+            
+            // Georeference location with proper validation
+            function georeferenceLocation(lat, lng, type = 'passenger') {
+                const location = {
+                    lat: parseFloat(lat),
+                    lng: parseFloat(lng),
+                    type: type,
+                    timestamp: Date.now(),
+                    accuracy: null,
+                    address: null
+                };
+                
+                // Validate coordinates
+                if (Math.abs(location.lat) > 90 || Math.abs(location.lng) > 180) {
+                    console.error('❌ Invalid coordinates:', lat, lng);
+                    return null;
+                }
+                
+                // Add geocoding for better location context
+                geocodeLocation(location);
+                
+                return location;
+            }
+            
+            // Geocode location to get address
+            async function geocodeLocation(location) {
+                const cacheKey = `${location.lat.toFixed(4)},${location.lng.toFixed(4)}`;
+                
+                if (geocodedLocations.has(cacheKey)) {
+                    location.address = geocodedLocations.get(cacheKey);
+                    return location.address;
+                }
+                
+                try {
+                    // Using Nominatim (OpenStreetMap) for geocoding
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}&zoom=18&addressdetails=1`);
+                    const data = await response.json();
+                    
+                    if (data && data.display_name) {
+                        location.address = data.display_name;
+                        geocodedLocations.set(cacheKey, data.display_name);
+                        console.log(`📍 Geocoded ${location.type}:`, data.display_name);
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Geocoding failed:', error);
+                    location.address = 'Unknown location';
+                }
+                
+                return location.address;
+            }
+            
+            // Calculate distance between two points (Haversine formula)
+            function calculateDistance(lat1, lng1, lat2, lng2) {
+                const R = 6371; // Earth's radius in kilometers
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLng = (lng2 - lng1) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLng/2) * Math.sin(dLng/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c; // Distance in kilometers
+            }
+            
+            // Calculate estimated time of arrival (ETA)
+            function calculateETA(distance, vehicleType = 'taxi') {
+                const speeds = {
+                    taxi: 40,    // km/h average city speed
+                    shuttle: 35,  // km/h (slower due to stops)
+                    pragia: 45    // km/h (motorcycle, faster)
+                };
+                
+                const speed = speeds[vehicleType] || speeds.taxi;
+                const timeHours = distance / speed;
+                const timeMinutes = Math.round(timeHours * 60);
+                
+                return {
+                    minutes: timeMinutes,
+                    formatted: `${timeMinutes} min`,
+                    distance: distance.toFixed(1)
+                };
+            }
+            
+            // Get route using OSRM (Open Source Routing Machine)
+            async function getRoute(startLat, startLng, endLat, endLng, profile = 'driving') {
+                try {
+                    const url = `https://router.project-osrm.org/route/v1/${profile}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson&steps=true`;
+                    
+                    console.log(`🛣️ Getting route: ${startLat},${startLng} → ${endLat},${endLng}`);
+                    
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    if (data && data.routes && data.routes.length > 0) {
+                        const route = data.routes[0];
+                        return {
+                            geometry: route.geometry,
+                            distance: route.distance / 1000, // Convert to km
+                            duration: route.duration / 60,    // Convert to minutes
+                            steps: route.legs[0].steps,
+                            coordinates: route.geometry.coordinates.map(coord => [coord[1], coord[0]]) // Flip lat/lng
+                        };
+                    }
+                } catch (error) {
+                    console.error('❌ Route calculation failed:', error);
+                    return null;
+                }
+                
+                return null;
+            }
+            
+            // Draw route on map
+            function drawRoute(routeData, style = {}) {
+                if (!map || !routeData || !routeData.coordinates) {
+                    console.warn('⚠️ Cannot draw route - missing data');
+                    return null;
+                }
+                
+                // Remove existing route
+                if (activeRoute) {
+                    map.removeLayer(activeRoute);
+                }
+                
+                const defaultStyle = {
+                    color: '#3b82f6',
+                    weight: 4,
+                    opacity: 0.7,
+                    dashArray: null
+                };
+                
+                const routeStyle = { ...defaultStyle, ...style };
+                
+                // Create route polyline
+                const route = L.polyline(routeData.coordinates, routeStyle).addTo(map);
+                
+                // Add route information
+                const distance = routeData.distance.toFixed(1);
+                const duration = Math.round(routeData.duration);
+                
+                route.bindPopup(`
+                    <div style="text-align: center; font-size: 12px;">
+                        <strong>Route Information</strong><br>
+                        📏 Distance: ${distance} km<br>
+                        ⏱️ Duration: ${duration} min<br>
+                        🚗 Profile: ${config.routing.profile}
+                    </div>
+                `);
+                
+                activeRoute = route;
+                
+                // Fit map to show route
+                if (routeData.coordinates.length > 0) {
+                    map.fitBounds(route.getBounds(), { padding: [50, 50] });
+                }
+                
+                console.log(`✅ Route drawn: ${distance} km, ${duration} min`);
+                
+                return route;
+            }
+            
+            // Update driver route to passenger
+            async function updateDriverRoute(driverId, passengerPos) {
+                const driver = drivers[driverId];
+                if (!driver || !passengerPos) {
+                    console.warn('⚠️ Cannot update route - missing driver or passenger');
+                    return;
+                }
+                
+                const driverPos = driver.getLatLng();
+                
+                // Get route from driver to passenger
+                const routeData = await getRoute(
+                    driverPos.lat, driverPos.lng,
+                    passengerPos.lat, passengerPos.lng,
+                    'driving'
+                );
+                
+                if (routeData) {
+                    // Draw driver route with specific style
+                    const routeStyle = {
+                        color: '#ef4444', // Red for driver route
+                        weight: 4,
+                        opacity: 0.8,
+                        dashArray: '10, 5'
+                    };
+                    
+                    driverRoute = drawRoute(routeData, routeStyle);
+                    
+                    // Update driver navigation panel with route info
+                    const eta = calculateETA(routeData.distance, driver.vehicleType);
+                    updateDriverNavigationPanel(driverId, eta, routeData);
+                    
+                    console.log(`🚗 Driver ${driverId} route updated: ${routeData.distance.toFixed(1)} km, ${Math.round(routeData.duration)} min`);
+                }
+            }
+            
+            // Update passenger route to driver
+            async function updatePassengerRoute(driverId) {
+                const driver = drivers[driverId];
+                if (!driver || !passengerPosition) {
+                    console.warn('⚠️ Cannot update passenger route - missing driver or passenger');
+                    return;
+                }
+                
+                const driverPos = driver.getLatLng();
+                
+                // Get route from passenger to driver
+                const routeData = await getRoute(
+                    passengerPosition.lat, passengerPosition.lng,
+                    driverPos.lat, driverPos.lng,
+                    'walking' // Passenger walks to pickup
+                );
+                
+                if (routeData) {
+                    // Draw passenger route with specific style
+                    const routeStyle = {
+                        color: '#10b981', // Green for passenger route
+                        weight: 3,
+                        opacity: 0.6,
+                        dashArray: '5, 5'
+                    };
+                    
+                    passengerRoute = drawRoute(routeData, routeStyle);
+                    
+                    // Update passenger info
+                    const eta = calculateETA(routeData.distance, 'walking');
+                    updatePassengerRouteInfo(driverId, eta, routeData);
+                    
+                    console.log(`📍 Passenger route updated: ${routeData.distance.toFixed(1)} km, ${Math.round(routeData.duration)} min`);
+                }
+            }
+            
+            // Update driver navigation panel with route information
+            function updateDriverNavigationPanel(driverId, eta, routeData) {
+                const panel = document.getElementById('navigation-content');
+                if (!panel) return;
+                
+                const vehicle = config.vehicleTypes[drivers[driverId].vehicleType];
+                
+                panel.innerHTML = `
+                    <div style="text-align: center;">
+                        <h4 style="color: #10b981; margin: 0 0 15px 0;">🚗 Mission Active</h4>
+                        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                            <div style="font-size: 14px; margin-bottom: 5px;"><strong>Driver ${driverId}</strong></div>
+                            <div style="font-size: 12px; color: #94a3b8;">Status: <span style="color: #10b981;">En Route</span></div>
+                            <div style="font-size: 12px; color: #94a3b8;">Vehicle: ${vehicle.icon} ${vehicle.name}</div>
+                        </div>
+                        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                            <div style="font-size: 14px; margin-bottom: 8px;"><strong>📍 Route Information</strong></div>
+                            <div style="font-size: 12px; color: #94a3b8;">📏 Distance: ${routeData.distance.toFixed(1)} km</div>
+                            <div style="font-size: 12px; color: #94a3b8;">⏱️ ETA: ${eta.formatted}</div>
+                            <div style="font-size: 12px; color: #94a3b8;">🚗 Speed: ${vehicle.name} profile</div>
+                        </div>
+                        <div style="font-size: 12px; color: #cbd5e1; margin-bottom: 15px;">
+                            <div>📍 Navigate to pickup location</div>
+                            <div>📞 Contact passenger when nearby</div>
+                            <div>✅ Confirm pickup on arrival</div>
+                        </div>
+                        <button onclick="window.UniHubTracking.completeMission('${driverId}')" style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; width: 100%;">Complete Pickup</button>
+                    </div>
+                `;
+            }
+            
+            // Update passenger route information
+            function updatePassengerRouteInfo(driverId, eta, routeData) {
+                const vehicle = config.vehicleTypes[drivers[driverId].vehicleType];
+                
+                // Update passenger marker popup with route info
+                if (passengerMarker) {
+                    passengerMarker.setPopupContent(`
+                        <div style="text-align: center;">
+                            <div style="font-size: 16px; margin-bottom: 8px;">📍 Your Location</div>
+                            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
+                                <div style="font-size: 12px; color: #10b981; margin-bottom: 4px;"><strong>Driver ${driverId} is coming</strong></div>
+                                <div style="font-size: 11px; color: #64748b;">${vehicle.icon} ${vehicle.name}</div>
+                                <div style="font-size: 11px; color: #64748b;">📏 ${routeData.distance.toFixed(1)} km away</div>
+                                <div style="font-size: 11px; color: #64748b;">⏱️ ${eta.formatted} walk time</div>
+                            </div>
+                            <div style="font-size: 10px; color: #94a3b8;">Click driver marker for details</div>
+                        </div>
+                    `);
+                }
+                
+                // Show notification to passenger
+                showNotification(`🚗 ${vehicle.name} ${driverId} is ${routeData.distance.toFixed(1)} km away - ${eta.formatted} walk`);
+            }
+            
+            // Clear all routes
+            function clearRoutes() {
+                if (activeRoute) {
+                    map.removeLayer(activeRoute);
+                    activeRoute = null;
+                }
+                if (driverRoute) {
+                    map.removeLayer(driverRoute);
+                    driverRoute = null;
+                }
+                if (passengerRoute) {
+                    map.removeLayer(passengerRoute);
+                    passengerRoute = null;
+                }
+            }
+            
+            // Enhanced passenger location update with georeferencing
+            function updatePassengerLocationWithGeoreference(lat, lng, accuracy = null) {
+                const georeferencedLocation = georeferenceLocation(lat, lng, 'passenger');
+                if (!georeferencedLocation) {
+                    console.error('❌ Failed to georeference passenger location');
+                    return;
+                }
+                
+                georeferencedLocation.accuracy = accuracy;
+                passengerPosition = georeferencedLocation;
+                
+                try {
+                    // Remove existing passenger marker
+                    if (passengerMarker) {
+                        map.removeLayer(passengerMarker);
+                    }
+                    
+                    // Create passenger icon with accuracy indicator
+                    const accuracyRadius = accuracy ? L.circle([lat, lng], {
+                        radius: accuracy,
+                        color: '#10b981',
+                        fillColor: '#10b981',
+                        fillOpacity: 0.1,
+                        weight: 1
+                    }) : null;
+                    
+                    const passengerIcon = L.divIcon({
+                        html: '<div style="background: #10b981; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); position: relative;"><div style="position: absolute; top: -8px; right: -8px; background: #ef4444; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;"></div></div>',
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12],
+                        popupAnchor: [0, -12]
+                    });
+                    
+                    // Add passenger marker
+                    passengerMarker = L.marker([lat, lng], { icon: passengerIcon })
+                        .addTo(map)
+                        .bindPopup('📍 Your Location');
+                    
+                    // Add accuracy circle if available
+                    if (accuracyRadius) {
+                        accuracyRadius.addTo(map);
+                    }
+                    
+                    // Center map on passenger if no drivers
+                    if (Object.keys(drivers).length === 0) {
+                        map.setView([lat, lng], config.defaultZoom);
+                    }
+                    
+                    // Update routes if active mission exists
+                    if (activeMission) {
+                        updateDriverRoute(activeMission.driverId, passengerPosition);
+                        updatePassengerRoute(activeMission.driverId);
+                    }
+                    
+                    console.log(`✅ Passenger location updated: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${accuracy || 'unknown'}m)`);
+                    
+                } catch (error) {
+                    console.error('❌ Failed to update passenger location:', error);
+                }
+            }
+            
             // Public API
             window.UniHubTracking = {
                 init: initTracking,
@@ -1020,7 +1525,29 @@
                 toggleMobileMap: toggleMobileMap,
                 completeMission: completeMission,
                 getActiveMission: () => activeMission,
-                getLocationPermission: () => locationPermission
+                getLocationPermission: () => locationPermission,
+                
+                // New georeferencing and routing API
+                georeferenceLocation: georeferenceLocation,
+                calculateDistance: calculateDistance,
+                calculateETA: calculateETA,
+                getRoute: getRoute,
+                drawRoute: drawRoute,
+                clearRoutes: clearRoutes,
+                updateDriverRoute: updateDriverRoute,
+                updatePassengerRoute: updatePassengerRoute,
+                openGoogleMaps: (driverId) => {
+                    const driver = drivers[driverId];
+                    if (driver && passengerPosition) {
+                        const driverPos = driver.getLatLng();
+                        const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${driverPos.lat},${driverPos.lng}&destination=${passengerPosition.lat},${passengerPosition.lng}&travelmode=driving`;
+                        window.open(mapsUrl, '_blank');
+                    }
+                },
+                getGeocodedAddress: (lat, lng) => {
+                    const cacheKey = `${parseFloat(lat).toFixed(4)},${parseFloat(lng).toFixed(4)}`;
+                    return geocodedLocations.get(cacheKey) || null;
+                }
             };
             
             // Global functions for button onclick handlers
