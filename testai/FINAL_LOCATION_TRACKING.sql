@@ -180,7 +180,7 @@ RETURNS TABLE(
   "vehicleType" TEXT,
   status TEXT,
   distance_km DECIMAL(8, 2),
-  eta_minutes INTEGER,
+  eta_minutes DECIMAL(8, 2),
   rating DECIMAL(3, 2)
 ) AS $$
 BEGIN
@@ -198,12 +198,12 @@ BEGIN
       cos(radians(dl.longitude) - radians(p_longitude)) + 
       sin(radians(p_latitude)) * sin(radians(dl.latitude))
     ))::decimal(8,2) as distance_km,
-    -- Estimate ETA (assuming 30 km/h average speed)
+    -- Estimate ETA (assuming 30 km/h average speed) - return as decimal
     CEIL((6371 * acos(
       cos(radians(p_latitude)) * cos(radians(dl.latitude)) * 
       cos(radians(dl.longitude) - radians(p_longitude)) + 
       sin(radians(p_latitude)) * sin(radians(dl.latitude))
-    )) / 30 * 60) as eta_minutes,
+    )) / 30 * 60)::decimal(8,2) as eta_minutes,
     d.rating
   FROM public.driver_locations dl
   JOIN public.unihub_drivers d ON dl.driver_id = d.id
