@@ -186,6 +186,14 @@
         </select>
     </div>
     
+    <!-- Driver Direction Map Toggle -->
+    <div id="driver-direction-toggle" style="position: fixed; top: 20px; right: 20px; z-index: 10000; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: none;">
+        <div style="font-size: 12px; margin-bottom: 5px;">🗺️ Driver Navigation</div>
+        <button onclick="window.toggleDriverDirections()" style="padding: 8px 12px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;">
+            🗺️ Show Directions
+        </button>
+    </div>
+    
     <script type="module" src="./index.tsx"></script>
     <script>
         if ('serviceWorker' in navigator) {
@@ -335,32 +343,6 @@
             
             // Create UI elements
             function createUI() {
-                // Create mobile toggle button
-                const mobileToggle = document.createElement('button');
-                mobileToggle.id = 'mobile-map-toggle';
-                mobileToggle.innerHTML = '🗺️ Show Map';
-                mobileToggle.style.cssText = `
-                    position: fixed;
-                    bottom: 20px;
-                    right: 20px;
-                    background: #3b82f6;
-                    color: white;
-                    border: none;
-                    padding: 12px 20px;
-                    border-radius: 25px;
-                    font-size: 14px;
-                    font-weight: 600;
-                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-                    z-index: 10001;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                `;
-                mobileToggle.onclick = () => {
-                    console.log('🗺️ Toggle clicked');
-                    toggleMobileMap();
-                };
-                document.body.appendChild(mobileToggle);
-                
                 // Create vehicle type filter
                 const vehicleFilter = document.createElement('div');
                 vehicleFilter.id = 'vehicle-filter';
@@ -1337,6 +1319,38 @@
                     contentDiv.innerHTML = content;
                     panel.style.display = 'block';
                 }
+                
+                // Set user role and update UI
+                function setUserRole(role) {
+                    trackingState.currentUserRole = role;
+                    console.log(`👤 User role set to: ${role}`);
+                    
+                    // Show/hide driver direction toggle based on role
+                    const driverToggle = document.getElementById('driver-direction-toggle');
+                    if (driverToggle) {
+                        driverToggle.style.display = role === 'DRIVER' ? 'block' : 'none';
+                    }
+                    
+                    // Update role selector
+                    const roleSelector = document.getElementById('role-selector');
+                    if (roleSelector) {
+                        roleSelector.style.display = 'block';
+                    }
+                    
+                    // Initialize role-specific features
+                    if (role === enhancedConfig.userRoles.DRIVER) {
+                        initializeDriverFeatures();
+                    } else if (role === enhancedConfig.userRoles.PASSENGER) {
+                        initializePassengerFeatures();
+                    } else if (role === enhancedConfig.userRoles.ADMIN) {
+                        initializeAdminFeatures();
+                    }
+                }
+                
+                // Reset for next mission
+                setTimeout(() => {
+                    activeMission = null;
+                }, 2000);
             }
             
             // Close driver panel
@@ -1346,6 +1360,160 @@
                     panel.style.display = 'none';
                 }
             }
+            
+            // Toggle driver directions map
+            window.toggleDriverDirections = function() {
+                const button = document.querySelector('#driver-direction-toggle button');
+                const map = window.map;
+                
+                if (!map) {
+                    console.error('❌ Map not available');
+                    return;
+                }
+                
+                // Toggle direction layer visibility
+                if (!window.directionsVisible) {
+                    // Show directions
+                    button.textContent = '🗺️ Hide Directions';
+                    button.style.background = '#ef4444';
+                    
+                    // Add direction controls
+                    addDirectionControls();
+                    
+                    // Show existing routes
+                    showAllRoutes();
+                    
+                    window.directionsVisible = true;
+                    console.log('🗺️ Driver directions enabled');
+                } else {
+                    // Hide directions
+                    button.textContent = '🗺️ Show Directions';
+                    button.style.background = '#10b981';
+                    
+                    // Remove direction controls
+                    removeDirectionControls();
+                    
+                    // Hide routes
+                    hideAllRoutes();
+                    
+                    window.directionsVisible = false;
+                    console.log('🗺️ Driver directions disabled');
+                }
+            };
+            
+            // Add direction controls to map
+            function addDirectionControls() {
+                if (document.getElementById('direction-controls')) return;
+                
+                const controls = document.createElement('div');
+                controls.id = 'direction-controls';
+                controls.style.cssText = `
+                    position: absolute;
+                    top: 80px;
+                    right: 10px;
+                    background: white;
+                    padding: 10px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                    z-index: 1000;
+                    font-size: 12px;
+                `;
+                
+                controls.innerHTML = `
+                    <div style="margin-bottom: 8px; font-weight: 600;">🗺️ Navigation</div>
+                    <button onclick="window.centerOnDriver()" style="
+                        display: block;
+                        width: 100%;
+                        padding: 6px;
+                        margin-bottom: 4px;
+                        background: #3b82f6;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 11px;
+                    ">🚗 Center Driver</button>
+                    <button onclick="window.centerOnPassenger()" style="
+                        display: block;
+                        width: 100%;
+                        padding: 6px;
+                        margin-bottom: 4px;
+                        background: #10b981;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 11px;
+                    ">👤 Center Passenger</button>
+                    <button onclick="window.openGoogleMaps()" style="
+                        display: block;
+                        width: 100%;
+                        padding: 6px;
+                        background: #f59e0b;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 11px;
+                    ">🌍 Google Maps</button>
+                `;
+                
+                map.getContainer().appendChild(controls);
+            }
+            
+            // Remove direction controls
+            function removeDirectionControls() {
+                const controls = document.getElementById('direction-controls');
+                if (controls) {
+                    controls.remove();
+                }
+            }
+            
+            // Show all routes
+            function showAllRoutes() {
+                // Implementation depends on your route system
+                console.log('🗺️ Showing all driver routes');
+            }
+            
+            // Hide all routes
+            function hideAllRoutes() {
+                // Implementation depends on your route system
+                console.log('🗺️ Hiding all driver routes');
+            }
+            
+            // Center on driver
+            window.centerOnDriver = function() {
+                if (window.advancedMap) {
+                    const drivers = window.advancedMap.getDrivers();
+                    if (drivers.size > 0) {
+                        const firstDriver = drivers.values().next().value;
+                        if (firstDriver && firstDriver.data) {
+                            window.map.setView([firstDriver.data.lat, firstDriver.data.lng], 16);
+                        }
+                    }
+                }
+            };
+            
+            // Center on passenger
+            window.centerOnPassenger = function() {
+                if (window.advancedMap) {
+                    const passengerPos = window.advancedMap.getPassengerPosition();
+                    if (passengerPos) {
+                        window.map.setView([passengerPos.lat, passengerPos.lng], 16);
+                    }
+                }
+            };
+            
+            // Open Google Maps
+            window.openGoogleMaps = function() {
+                if (window.advancedMap) {
+                    const passengerPos = window.advancedMap.getPassengerPosition();
+                    if (passengerPos) {
+                        const url = `https://www.google.com/maps/@${passengerPos.lat},${passengerPos.lng},16z`;
+                        window.open(url, '_blank');
+                    }
+                }
+            };
             
             // Complete mission
             function completeMission(driverId) {
@@ -1889,11 +2057,7 @@
                         transition: all 0.3s ease;
                     }
                     
-                    #mobile-map-toggle:hover {
-                        transform: scale(1.05);
-                        box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
-                    }
-                }
+                                    }
             `;
             document.head.appendChild(style);
             
