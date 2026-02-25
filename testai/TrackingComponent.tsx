@@ -7,11 +7,78 @@ declare global {
   }
 }
 
+// Vehicle type icons mapping
+const VEHICLE_ICONS = {
+  'Pragia': '🛺',    // Shared taxi/minibus
+  'Taxi': '🚕',      // Regular taxi
+  'Shuttle': '🚌'     // Bus/van
+};
+
+// Driver status icons
+const STATUS_ICONS = {
+  'online': '🟢',    // Available
+  'busy': '🟡',      // On ride
+  'offline': '🔴'     // Not available
+};
+
+// Calculate distance between two points
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // Distance in km
+};
+
+// Show ETA for each driver
+const showETA = (driverLat: number, driverLng: number, passengerLat: number, passengerLng: number) => {
+  const distance = calculateDistance(driverLat, driverLng, passengerLat, passengerLng);
+  const avgSpeed = 30; // km/h in city traffic
+  const etaMinutes = Math.round((distance / avgSpeed) * 60);
+  
+  return `${distance.toFixed(1)}km away - ~${etaMinutes} min`;
+};
+
+// Create vehicle-specific icon
+const getVehicleIcon = (vehicleType: string) => {
+  return window.L.divIcon({
+    html: VEHICLE_ICONS[vehicleType] || '🚗',
+    iconSize: [35, 35],
+    className: `driver-marker ${vehicleType.toLowerCase()}-marker`
+  });
+};
+
+// Enhanced driver popup with status and info
+const createDriverPopup = (driver: any, passengerLat?: number, passengerLng?: number) => {
+  const etaInfo = passengerLat && passengerLng 
+    ? `<small>📍 ${showETA(driver.lat, driver.lng, passengerLat, passengerLng)}</small><br>`
+    : '';
+    
+  return `
+    <div class="driver-popup" style="font-family: system-ui, sans-serif; max-width: 200px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+        <span style="font-size: 16px;">${STATUS_ICONS[driver.status] || '🟢'}</span>
+        <strong style="color: #333;">${driver.name || `Driver ${driver.driverId}`}</strong>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+        <span style="font-size: 18px;">${VEHICLE_ICONS[driver.vehicleType] || '🚗'}</span>
+        <span style="color: #666; font-size: 14px;">${driver.vehicleType}</span>
+      </div>
+      ${etaInfo}
+      <small style="color: #888;">ID: ${driver.driverId}</small>
+    </div>
+  `;
+};
+
 const TrackingComponent: React.FC = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [isMapReady, setIsMapReady] = useState(false);
   const [drivers, setDrivers] = useState<any>({});
   const [passengerMarker, setPassengerMarker] = useState<any>(null);
+  const [passengerLocation, setPassengerLocation] = useState<{lat: number, lng: number} | null>(null);
   const [socket, setSocket] = useState<any>(null);
   const [map, setMap] = useState<any>(null);
 
@@ -45,6 +112,7 @@ const TrackingComponent: React.FC = () => {
       const watchId = navigator.geolocation.watchPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
+          setPassengerLocation({ lat: latitude, lng: longitude });
           
           if (passengerMarker) {
             passengerMarker.setLatLng([latitude, longitude]);
@@ -95,7 +163,7 @@ const TrackingComponent: React.FC = () => {
 
     // Update drivers on socket "driverLocationUpdate"
     socket.on('driverLocationUpdate', (data: any) => {
-      const { driverId, lat, lng, name } = data;
+      const { driverId, lat, lng, name, vehicleType, status } = data;
       
       setDrivers(prev => {
         const updatedDrivers = { ...prev };
@@ -103,17 +171,17 @@ const TrackingComponent: React.FC = () => {
         if (updatedDrivers[driverId]) {
           // Update existing driver position
           updatedDrivers[driverId].setLatLng([lat, lng]);
+          // Update popup with new info
+          updatedDrivers[driverId].setPopupContent(
+            createDriverPopup({ driverId, lat, lng, name, vehicleType, status }, passengerLocation?.lat, passengerLocation?.lng)
+          );
         } else {
-          // Create new driver marker
-          const driverIcon = window.L.divIcon({
-            html: '🚗',
-            iconSize: [30, 30],
-            className: 'driver-marker'
-          });
+          // Create new driver marker with vehicle-specific icon
+          const driverIcon = getVehicleIcon(vehicleType || 'Taxi');
           
           const marker = window.L.marker([lat, lng], { icon: driverIcon })
             .addTo(map)
-            .bindPopup(name || `Driver ${driverId}`);
+            .bindPopup(createDriverPopup({ driverId, lat, lng, name, vehicleType, status }, passengerLocation?.lat, passengerLocation?.lng));
           
           updatedDrivers[driverId] = marker;
           
@@ -140,7 +208,7 @@ const TrackingComponent: React.FC = () => {
       socket.off('driverLocationUpdate');
       socket.off('rideAssigned');
     };
-  }, [socket, isMapReady, map]);
+  }, [socket, isMapReady, map, passengerLocation]);
 
   // Fallback function for manual ride assignment
   const assignRide = (driverLat: number, driverLng: number, passengerLat: number, passengerLng: number) => {
@@ -149,30 +217,25 @@ const TrackingComponent: React.FC = () => {
   };
 
   // Function to simulate driver location updates (for testing)
-  const simulateDriver = (driverId: string, lat: number, lng: number, name?: string) => {
+  const simulateDriver = (driverId: string, lat: number, lng: number, name?: string, vehicleType?: string, status?: string) => {
     if (!map) return;
     
-    setDrivers(prev => {
-      const updatedDrivers = { ...prev };
+    const driverIcon = getVehicleIcon(vehicleType || 'Taxi');
+    
+    if (drivers[driverId]) {
+      // Update existing driver
+      drivers[driverId].setLatLng([lat, lng]);
+      drivers[driverId].setPopupContent(
+        createDriverPopup({ driverId, lat, lng, name, vehicleType, status }, passengerLocation?.lat, passengerLocation?.lng)
+      );
+    } else {
+      // Create new driver
+      const marker = window.L.marker([lat, lng], { icon: driverIcon })
+        .addTo(map)
+        .bindPopup(createDriverPopup({ driverId, lat, lng, name, vehicleType, status }, passengerLocation?.lat, passengerLocation?.lng));
       
-      if (updatedDrivers[driverId]) {
-        updatedDrivers[driverId].setLatLng([lat, lng]);
-      } else {
-        const driverIcon = window.L.divIcon({
-          html: '🚗',
-          iconSize: [30, 30],
-          className: 'driver-marker'
-        });
-        
-        const marker = window.L.marker([lat, lng], { icon: driverIcon })
-          .addTo(map)
-          .bindPopup(name || `Driver ${driverId}`);
-        
-        updatedDrivers[driverId] = marker;
-      }
-      
-      return updatedDrivers;
-    });
+      setDrivers(prev => ({ ...prev, [driverId]: marker }));
+    }
   };
 
   // Make functions available globally for testing
