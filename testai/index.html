@@ -158,6 +158,31 @@
     <!-- UniHub Live Tracking Module - Map Container -->
     <div id="map"></div>
     
+    <!-- Enhanced Location Tracking -->
+    <script src="enhanced-location-tracker.js"></script>
+    
+    <!-- Driver Navigation System -->
+    <script src="driver-navigation-system.js"></script>
+    
+    <!-- Role-based Tracking -->
+    <script src="role-based-tracking.js"></script>
+    
+    <!-- NexRyde Demand Analysis -->
+    <script src="nexryde-demand-analysis.js"></script>
+    
+    <!-- Map Layout & Location Fixes -->
+    <script src="map-layout-location-fix.js"></script>
+    
+    <!-- Role Selector for Testing -->
+    <div id="role-selector" style="position: fixed; top: 20px; left: 20px; z-index: 10000; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <div style="font-size: 12px; margin-bottom: 5px;">👤 User Role:</div>
+        <select onchange="window.UniHubTracking.setUserRole(this.value)" style="padding: 5px; border-radius: 4px; border: 1px solid #d1d5db;">
+            <option value="PASSENGER">📍 Passenger</option>
+            <option value="DRIVER">🚗 Driver</option>
+            <option value="ADMIN">⚙️ Admin</option>
+        </select>
+    </div>
+    
     <script type="module" src="./index.tsx"></script>
     <script>
         if ('serviceWorker' in navigator) {
