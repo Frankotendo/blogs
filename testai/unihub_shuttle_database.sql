@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS drivers (
     last_location_update TIMESTAMP WITH TIME ZONE,
     is_online BOOLEAN DEFAULT FALSE,
     is_available BOOLEAN DEFAULT TRUE,
-    current_trip_id UUID REFERENCES trips(id),
+    current_trip_id UUID, -- Will reference trips after it's created
     rating DECIMAL(3, 2) DEFAULT 5.0,
     total_trips INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -120,6 +120,10 @@ CREATE TABLE IF NOT EXISTS trip_ratings (
     rating_type VARCHAR(20) CHECK (rating_type IN ('passenger_to_driver', 'driver_to_passenger')) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add foreign key constraint for drivers.current_trip_id after trips table exists
+ALTER TABLE drivers ADD CONSTRAINT fk_driver_current_trip 
+    FOREIGN KEY (current_trip_id) REFERENCES trips(id) ON DELETE SET NULL;
 
 -- Notifications
 CREATE TABLE IF NOT EXISTS notifications (
@@ -291,6 +295,10 @@ INSERT INTO shuttle_routes (route_name, route_color) VALUES
 ('Science Faculty Route', '#10b981'),
 ('Hostel Route', '#f59e0b');
 
+INSERT INTO shuttle_schedules (route_id, driver_id, start_time, end_time, frequency_minutes, days_of_week, is_active) VALUES
+((SELECT id FROM shuttle_routes WHERE route_name = 'Campus Main Route'), (SELECT id FROM drivers WHERE vehicle_plate = 'GT-1234-20'), '07:00:00', '18:00:00', 15, ARRAY['1', '2', '3', '4', '5'], TRUE),
+((SELECT id FROM shuttle_routes WHERE route_name = 'Science Faculty Route'), (SELECT id FROM drivers WHERE vehicle_plate = 'GT-1234-20'), '08:00:00', '17:00:00', 20, ARRAY['1', '2', '3', '4', '5'], TRUE);
+
 INSERT INTO shuttle_stops (route_id, stop_name, stop_order, latitude, longitude, estimated_wait_time) VALUES
 ((SELECT id FROM shuttle_routes WHERE route_name = 'Campus Main Route'), 'Main Gate', 1, 5.6037, -0.18696, 5),
 ((SELECT id FROM shuttle_routes WHERE route_name = 'Campus Main Route'), 'Library', 2, 5.6050, -0.1870, 8),
@@ -316,5 +324,5 @@ WHERE d.vehicle_type = 'shuttle'
 AND d.is_online = TRUE
 AND ss.is_active = TRUE
 AND sr.is_active = TRUE
-AND EXTRACT(DOW FROM NOW()) = ANY(ss.days_of_week)
+AND EXTRACT(DOW FROM NOW())::text = ANY(ss.days_of_week)
 AND NOW()::TIME BETWEEN ss.start_time AND ss.end_time;
