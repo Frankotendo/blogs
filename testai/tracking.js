@@ -29,8 +29,14 @@
     function initTracking() {
         console.log('🚀 Initializing UniHub Live Tracking...');
         
-        // Initialize map
-        initMap();
+        // Wait for DOM to be ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(initMap, 100); // Small delay to ensure React is rendered
+            });
+        } else {
+            setTimeout(initMap, 100);
+        }
         
         // Initialize Socket.IO connection
         initSocket();
@@ -47,8 +53,27 @@
     // Initialize Leaflet map
     function initMap() {
         try {
+            // Check if map container exists
+            const mapContainer = document.getElementById('map');
+            if (!mapContainer) {
+                console.error('❌ Map container not found');
+                return;
+            }
+            
+            // Set map container size
+            mapContainer.style.height = '400px';
+            mapContainer.style.width = '100%';
+            mapContainer.style.border = '1px solid #334155';
+            mapContainer.style.borderRadius = '8px';
+            mapContainer.style.background = '#0f172a';
+            
             // Create map instance
-            map = L.map('map').setView(config.mapCenter, config.defaultZoom);
+            map = L.map('map', {
+                center: config.mapCenter,
+                zoom: config.defaultZoom,
+                zoomControl: true,
+                attributionControl: true
+            });
             
             // Add OpenStreetMap tiles
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -56,16 +81,25 @@
                 maxZoom: config.maxZoom
             }).addTo(map);
             
-            // Set map container size
-            const mapContainer = document.getElementById('map');
-            if (mapContainer) {
-                mapContainer.style.height = '400px';
-                mapContainer.style.width = '100%';
-                mapContainer.style.border = '1px solid #ddd';
-                mapContainer.style.borderRadius = '8px';
-            }
+            // Enable map interactions
+            map.on('click', function(e) {
+                console.log('🗺️ Map clicked at:', e.latlng);
+            });
             
-            console.log('🗺️ Map initialized');
+            map.on('zoomend', function() {
+                console.log('🔍 Map zoom level:', map.getZoom());
+            });
+            
+            console.log('🗺️ Map initialized successfully');
+            
+            // Auto-start test mode after 2 seconds for demonstration
+            setTimeout(() => {
+                if (window.UniHubTracking && window.UniHubTracking.testMode) {
+                    console.log('🧪 Auto-starting test mode...');
+                    window.UniHubTracking.testMode();
+                }
+            }, 2000);
+            
         } catch (error) {
             console.error('❌ Failed to initialize map:', error);
         }

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UniHub Tracking Test</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; background: #020617; color: white; }
+        #map { height: 400px; width: 100%; border: 1px solid #334155; border-radius: 8px; }
+        .controls { margin: 20px 0; }
+        button { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 4px; margin: 5px; cursor: pointer; }
+        button:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>🚗 UniHub Live Tracking Test</h1>
+    <div id="map"></div>
+    <div class="controls">
+        <button onclick="addTestDriver()">Add Test Driver</button>
+        <button onclick="simulateRide()">Simulate Ride Assignment</button>
+        <button onclick="clearDrivers()">Clear All Drivers</button>
+        <button onclick="testNavigation()">Test Navigation</button>
+    </div>
+    <script>
+        let map = L.map('map').setView([5.6037, -0.18696], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        
+        let drivers = {};
+        let driverId = 1;
+        
+        function addTestDriver() {
+            const lat = 5.6037 + (Math.random() - 0.5) * 0.01;
+            const lng = -0.18696 + (Math.random() - 0.5) * 0.01;
+            
+            const marker = L.marker([lat, lng]).addTo(map)
+                .bindPopup(`🚗 Driver ${driverId}`);
+            
+            drivers[`driver${driverId}`] = marker;
+            driverId++;
+            
+            console.log(`Added driver at ${lat}, ${lng}`);
+        }
+        
+        function simulateRide() {
+            const keys = Object.keys(drivers);
+            if (keys.length > 0) {
+                const randomDriver = keys[Math.floor(Math.random() * keys.length)];
+                const marker = drivers[randomDriver];
+                const pos = marker.getLatLng();
+                
+                alert(`🎯 Ride assigned to ${randomDriver}!\nOpening Google Maps navigation...`);
+                
+                const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=5.6037,-0.18696&destination=${pos.lat},${pos.lng}&travelmode=driving`;
+                window.open(mapsUrl, '_blank');
+            }
+        }
+        
+        function clearDrivers() {
+            Object.values(drivers).forEach(marker => map.removeLayer(marker));
+            drivers = {};
+            console.log('All drivers cleared');
+        }
+        
+        function testNavigation() {
+            const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=5.6037,-0.18696&destination=5.6050,-0.1850&travelmode=driving`;
+            window.open(mapsUrl, '_blank');
+        }
+        
+        // Add initial test driver
+        setTimeout(addTestDriver, 1000);
+    </script>
+</body>
+</html>

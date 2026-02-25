@@ -115,6 +115,9 @@
           border-radius: 8px;
           margin: 20px 0;
           background: #0f172a;
+          position: relative;
+          z-index: 100;
+          display: block;
         }
         
         @media (max-width: 768px) {
@@ -122,6 +125,16 @@
             height: 300px;
             margin: 10px 0;
           }
+        }
+        
+        /* Ensure map is not hidden behind React app */
+        #root {
+          position: relative;
+          z-index: 1;
+        }
+        
+        body {
+          position: relative;
         }
     </style>
 <script type="importmap">
@@ -142,8 +155,13 @@
 <body>
     <div id="root"></div>
     
-    <!-- UniHub Live Tracking Module - Map Container -->
-    <div id="map"></div>
+    <!-- UniHub Live Tracking Module - Iframe Container -->
+    <iframe 
+        src="./tracking-iframe.html" 
+        style="width: 100%; height: 500px; border: 1px solid #334155; border-radius: 8px; margin: 20px 0;"
+        frameborder="0"
+        title="UniHub Live Tracking">
+    </iframe>
     
     <script type="module" src="./index.tsx"></script>
     <script>
@@ -155,8 +173,5 @@
             });
         }
     </script>
-    
-    <!-- UniHub Live Tracking Module - Tracking Script -->
-    <script src="./tracking.js"></script>
 </body>
 </html>
