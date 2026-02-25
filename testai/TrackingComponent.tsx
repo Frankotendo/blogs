@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
 declare global {
   interface Window {
@@ -6,6 +7,11 @@ declare global {
     io: any;
   }
 }
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://kzjgihwxiaeqzopeuzhm.supabase.co',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6cCI6Imt6cCI6InR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6cCI6InR5cCI6IkpXVCJ9.G_hWSgPstbOi9GgnGprZW1IQVFZSGPQnyC80RROmuw'
+);
 
 // Vehicle type icons mapping
 const VEHICLE_ICONS = {
@@ -81,6 +87,8 @@ const TrackingComponent: React.FC = () => {
   const [passengerLocation, setPassengerLocation] = useState<{lat: number, lng: number} | null>(null);
   const [socket, setSocket] = useState<any>(null);
   const [map, setMap] = useState<any>(null);
+  const driverMarkersRef = useRef<{[key: string]: any}>({});
+  const passengerMarkerRef = useRef<any>(null);
 
   useEffect(() => {
     if (!mapRef.current || !window.L) return;
@@ -114,8 +122,9 @@ const TrackingComponent: React.FC = () => {
           const { latitude, longitude } = position.coords;
           setPassengerLocation({ lat: latitude, lng: longitude });
           
-          if (passengerMarker) {
-            passengerMarker.setLatLng([latitude, longitude]);
+          // Update existing marker instead of creating new one
+          if (passengerMarkerRef.current) {
+            passengerMarkerRef.current.setLatLng([latitude, longitude]);
           } else {
             const passengerIcon = window.L.divIcon({
               html: '👤',
@@ -127,7 +136,7 @@ const TrackingComponent: React.FC = () => {
               .addTo(leafletMap)
               .bindPopup('Your Location');
             
-            setPassengerMarker(marker);
+            passengerMarkerRef.current = marker;
             leafletMap.setView([latitude, longitude], 15);
           }
         },
@@ -160,6 +169,85 @@ const TrackingComponent: React.FC = () => {
 
   useEffect(() => {
     if (!socket || !isMapReady) return;
+
+    // Load real drivers from database
+    const loadRealDrivers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('driver_locations')
+          .select(`
+            driver_id,
+            latitude,
+            longitude,
+            last_updated
+          `)
+          .order('last_updated', { ascending: false });
+
+        if (error) {
+          console.error('Error loading drivers:', error);
+          return;
+        }
+
+        // Get driver details
+        const driverIds = data?.map(d => d.driver_id) || [];
+        const { data: driversData, error: driversError } = await supabase
+          .from('unihub_drivers')
+          .select('id, name, "vehicleType", status')
+          .in('id', driverIds);
+
+        if (driversError) {
+          console.error('Error loading driver details:', driversError);
+          return;
+        }
+
+        // Update map with real driver locations
+        data?.forEach(driverLocation => {
+          const driverDetails = driversData?.find(d => d.id === driverLocation.driver_id);
+          if (driverDetails && map) {
+            const driverIcon = getVehicleIcon(driverDetails.vehicleType);
+            
+            if (driverMarkersRef.current[driverLocation.driver_id]) {
+              // Update existing marker
+              driverMarkersRef.current[driverLocation.driver_id].setLatLng([driverLocation.latitude, driverLocation.longitude]);
+              driverMarkersRef.current[driverLocation.driver_id].setPopupContent(
+                createDriverPopup({
+                  driverId: driverLocation.driver_id,
+                  lat: driverLocation.latitude,
+                  lng: driverLocation.longitude,
+                  name: driverDetails.name,
+                  vehicleType: driverDetails.vehicleType,
+                  status: driverDetails.status
+                }, passengerLocation?.lat, passengerLocation?.lng)
+              );
+            } else {
+              // Create new marker
+              const marker = window.L.marker([driverLocation.latitude, driverLocation.longitude], { icon: driverIcon })
+                .addTo(map)
+                .bindPopup(createDriverPopup({
+                  driverId: driverLocation.driver_id,
+                  lat: driverLocation.latitude,
+                  lng: driverLocation.longitude,
+                  name: driverDetails.name,
+                  vehicleType: driverDetails.vehicleType,
+                  status: driverDetails.status
+                }, passengerLocation?.lat, passengerLocation?.lng));
+              
+              driverMarkersRef.current[driverLocation.driver_id] = marker;
+            }
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load drivers:', err);
+      }
+    };
+
+    loadRealDrivers();
+    const interval = setInterval(loadRealDrivers, 5000); // Update every 5 seconds
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [map, passengerLocation]);
 
     // Update drivers on socket "driverLocationUpdate"
     socket.on('driverLocationUpdate', (data: any) => {
