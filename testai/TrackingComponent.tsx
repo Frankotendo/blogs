@@ -249,41 +249,38 @@ const TrackingComponent: React.FC = () => {
     };
   }, [map, passengerLocation]);
 
+  useEffect(() => {
+    if (!socket || !isMapReady) return;
+
     // Update drivers on socket "driverLocationUpdate"
     socket.on('driverLocationUpdate', (data: any) => {
       const { driverId, lat, lng, name, vehicleType, status } = data;
       
-      setDrivers(prev => {
-        const updatedDrivers = { ...prev };
+      if (driverMarkersRef.current[driverId]) {
+        // Update existing driver position
+        driverMarkersRef.current[driverId].setLatLng([lat, lng]);
+        // Update popup with new info
+        driverMarkersRef.current[driverId].setPopupContent(
+          createDriverPopup({ driverId, lat, lng, name, vehicleType, status }, passengerLocation?.lat, passengerLocation?.lng)
+        );
+      } else {
+        // Create new driver marker with vehicle-specific icon
+        const driverIcon = getVehicleIcon(vehicleType || 'Taxi');
         
-        if (updatedDrivers[driverId]) {
-          // Update existing driver position
-          updatedDrivers[driverId].setLatLng([lat, lng]);
-          // Update popup with new info
-          updatedDrivers[driverId].setPopupContent(
-            createDriverPopup({ driverId, lat, lng, name, vehicleType, status }, passengerLocation?.lat, passengerLocation?.lng)
-          );
-        } else {
-          // Create new driver marker with vehicle-specific icon
-          const driverIcon = getVehicleIcon(vehicleType || 'Taxi');
-          
-          const marker = window.L.marker([lat, lng], { icon: driverIcon })
-            .addTo(map)
-            .bindPopup(createDriverPopup({ driverId, lat, lng, name, vehicleType, status }, passengerLocation?.lat, passengerLocation?.lng));
-          
-          updatedDrivers[driverId] = marker;
-          
-          // Center map on driver if it's the first one
-          if (Object.keys(updatedDrivers).length === 1) {
-            map.setView([lat, lng], 15);
-          }
+        const marker = window.L.marker([lat, lng], { icon: driverIcon })
+          .addTo(map)
+          .bindPopup(createDriverPopup({ driverId, lat, lng, name, vehicleType, status }, passengerLocation?.lat, passengerLocation?.lng));
+        
+        driverMarkersRef.current[driverId] = marker;
+        
+        // Center map on driver if it's the first one
+        if (Object.keys(driverMarkersRef.current).length === 1) {
+          map.setView([lat, lng], 15);
         }
-        
-        return updatedDrivers;
-      });
+      }
     });
 
-    // On "rideAssigned" open Google Maps directions
+    // Handle ride assignment
     socket.on('rideAssigned', (data: any) => {
       const { driverLat, driverLng, passengerLat, passengerLng } = data;
       
@@ -310,10 +307,10 @@ const TrackingComponent: React.FC = () => {
     
     const driverIcon = getVehicleIcon(vehicleType || 'Taxi');
     
-    if (drivers[driverId]) {
+    if (driverMarkersRef.current[driverId]) {
       // Update existing driver
-      drivers[driverId].setLatLng([lat, lng]);
-      drivers[driverId].setPopupContent(
+      driverMarkersRef.current[driverId].setLatLng([lat, lng]);
+      driverMarkersRef.current[driverId].setPopupContent(
         createDriverPopup({ driverId, lat, lng, name, vehicleType, status }, passengerLocation?.lat, passengerLocation?.lng)
       );
     } else {
@@ -322,7 +319,7 @@ const TrackingComponent: React.FC = () => {
         .addTo(map)
         .bindPopup(createDriverPopup({ driverId, lat, lng, name, vehicleType, status }, passengerLocation?.lat, passengerLocation?.lng));
       
-      setDrivers(prev => ({ ...prev, [driverId]: marker }));
+      driverMarkersRef.current[driverId] = marker;
     }
   };
 
