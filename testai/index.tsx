@@ -5327,8 +5327,7 @@ const App: React.FC = () => {
       ]);
       alert("Partner approved and activated!");
     } catch (err: any) {
-      console.error("Approval error:", err);
-      alert("Activation failed: " + err.message);
+      alert("Failed to approve: " + err.message);
     }
   };
 
@@ -5339,6 +5338,50 @@ const App: React.FC = () => {
       .update({ status: "rejected" })
       .eq("id", regId);
     if (error) alert("Failed to reject: " + error.message);
+  };
+
+  // Handler functions for AdminPortal
+  const handleAddDriver = async (driver: Driver) => {
+    try {
+      await supabase.from("unihub_drivers").insert([driver]);
+      alert("Driver added successfully!");
+    } catch (err: any) {
+      alert("Failed to add driver: " + err.message);
+    }
+  };
+
+  const handleDeleteDriver = async (driverId: string) => {
+    if (!confirm("Are you sure you want to delete this driver?")) return;
+    
+    try {
+      await supabase.from("unihub_drivers").delete().eq("id", driverId);
+      if (activeDriverId === driverId) {
+        handleDriverLogout();
+      }
+      alert("Driver deleted successfully!");
+    } catch (err: any) {
+      alert("Failed to delete driver: " + err.message);
+    }
+  };
+
+  const handleCancelRide = async (rideId: string) => {
+    if (!confirm("Are you sure you want to cancel this ride?")) return;
+    
+    try {
+      await supabase.from("unihub_rides").update({ status: "completed" }).eq("id", rideId);
+      alert("Ride cancelled successfully!");
+    } catch (err: any) {
+      alert("Failed to cancel ride: " + err.message);
+    }
+  };
+
+  const handleSettleRide = async (rideId: string) => {
+    try {
+      await supabase.from("unihub_rides").update({ status: "completed" }).eq("id", rideId);
+      alert("Ride settled successfully!");
+    } catch (err: any) {
+      alert("Failed to settle ride: " + err.message);
+    }
   };
 
   const registerDriver = async (
@@ -5771,7 +5814,7 @@ const App: React.FC = () => {
                     safeSetViewMode("admin");
                     setSearchConfig({ ...searchConfig, query: "" });
                   }}
-                  badge={pendingRequests > 0 ? pendingRequests : undefined}
+                  badge={pendingRequestsCount > 0 ? pendingRequestsCount : undefined}
                 />
               )}
               <NavItem
@@ -6028,17 +6071,15 @@ const App: React.FC = () => {
                   <AdminLogin onLogin={handleAdminAuth} />
                 ) : (
                   <AdminPortal
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
                     nodes={nodes}
                     drivers={drivers}
-                    onUpdateStatus={handleDriverStatusUpdate}
-                    onAcceptRide={handleAcceptRide}
-                    onTopupRequest={handleTopupRequest}
-                    onRegistrationRequest={handleRegistrationRequest}
-                    onTransaction={handleTransaction}
-                    currentUser={currentUser}
-                    settings={settings}
-                    onSettingsUpdate={handleSettingsUpdate}
-                    isLoading={isDriverLoading}
+                    onAddDriver={handleAddDriver}
+                    onDeleteDriver={handleDeleteDriver}
+                    onCancelRide={handleCancelRide}
+                    onSettleRide={handleSettleRide}
+                    missions={missions}
                     onCreateMission={async (m: any) => {
                       const payload = {
                         id: crypto.randomUUID(),
@@ -6064,7 +6105,7 @@ const App: React.FC = () => {
                     onApproveRegistration={approveRegistration}
                     onRejectRegistration={rejectRegistration}
                     onLock={handleAdminLogout}
-                    searchConfig={searchConfig}
+                    settings={settings}
                     onUpdateSettings={updateGlobalSettings}
                     hubRevenue={hubRevenue}
                     adminEmail={session?.user?.email}
