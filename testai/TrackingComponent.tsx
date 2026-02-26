@@ -280,13 +280,48 @@ const TrackingComponent: React.FC = () => {
       }
     });
 
-    // Handle ride assignment
+    // Handle ride assignment with enhanced direction logic
     socket.on('rideAssigned', (data: any) => {
-      const { driverLat, driverLng, passengerLat, passengerLng } = data;
+      const { driverId, driverLat, driverLng, passengerLat, passengerLng, destinationLat, destinationLng } = data;
+      
+      // Enhanced direction logic: Driver -> Passenger -> Destination
+      let directionsUrl: string;
+      
+      if (destinationLat && destinationLng) {
+        // Full route: Driver -> Passenger -> Destination
+        directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${driverLat},${driverLng}&waypoints=${passengerLat},${passengerLng}&destination=${destinationLat},${destinationLng}`;
+        console.log(`Full route assigned for driver ${driverId}: Driver -> Passenger -> Destination`);
+      } else {
+        // Simple route: Driver -> Passenger
+        directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${driverLat},${driverLng}&destination=${passengerLat},${passengerLng}`;
+        console.log(`Simple route assigned for driver ${driverId}: Driver -> Passenger`);
+      }
+      
+      // Store direction assignment for tracking
+      const directionData = {
+        driverId,
+        driverLocation: { lat: driverLat, lng: driverLng },
+        passengerLocation: { lat: passengerLat, lng: passengerLng },
+        destination: destinationLat && destinationLng ? { lat: destinationLat, lng: destinationLng } : null,
+        directionsUrl,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Store in localStorage for tracking (fallback if DB not available)
+      const storedDirections = JSON.parse(localStorage.getItem('driverDirections') || '[]');
+      storedDirections.push(directionData);
+      localStorage.setItem('driverDirections', JSON.stringify(storedDirections.slice(-10))); // Keep last 10
       
       // Open Google Maps directions in new tab
-      const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${passengerLat},${passengerLng}&destination=${driverLat},${driverLng}`;
       window.open(directionsUrl, '_blank');
+      
+      // Show notification to driver
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('New Ride Assignment', {
+          body: `Navigate to passenger location. Route opened in Google Maps.`,
+          icon: '/favicon.ico'
+        });
+      }
     });
 
     return () => {
@@ -295,9 +330,27 @@ const TrackingComponent: React.FC = () => {
     };
   }, [socket, isMapReady, map, passengerLocation]);
 
-  // Fallback function for manual ride assignment
-  const assignRide = (driverLat: number, driverLng: number, passengerLat: number, passengerLng: number) => {
-    const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${passengerLat},${passengerLng}&destination=${driverLat},${driverLng}`;
+  // Fallback function for manual ride assignment with enhanced direction logic
+  const assignRide = (
+    driverLat: number, 
+    driverLng: number, 
+    passengerLat: number, 
+    passengerLng: number,
+    destinationLat?: number,
+    destinationLng?: number
+  ) => {
+    let directionsUrl: string;
+    
+    if (destinationLat && destinationLng) {
+      // Full route: Driver -> Passenger -> Destination
+      directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${driverLat},${driverLng}&waypoints=${passengerLat},${passengerLng}&destination=${destinationLat},${destinationLng}`;
+      console.log('Manual full route: Driver -> Passenger -> Destination');
+    } else {
+      // Simple route: Driver -> Passenger
+      directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${driverLat},${driverLng}&destination=${passengerLat},${passengerLng}`;
+      console.log('Manual simple route: Driver -> Passenger');
+    }
+    
     window.open(directionsUrl, '_blank');
   };
 

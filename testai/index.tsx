@@ -123,6 +123,7 @@ interface RideNode {
   destination: string;
   origin: string;
   capacityNeeded: number;
+  maxCapacity?: number; // Maximum vehicle capacity
   passengers: Passenger[];
   status: NodeStatus;
   leaderName: string;
@@ -5525,16 +5526,31 @@ const App: React.FC = () => {
 
     const isShuttle = latestDriver.vehicleType === "Shuttle";
     const rawSeats = parseInt(data.seats);
-    const capacity =
-      !rawSeats || rawSeats < 1 ? (isShuttle ? 10 : 3) : rawSeats;
+    
+    // ENFORCED VEHICLE CAPACITY LIMITS
+    const VEHICLE_CAPACITIES = {
+      'Pragia': 4,
+      'Taxi': 4,
+      'Shuttle': 60
+    };
+    
+    const maxCapacity = VEHICLE_CAPACITIES[latestDriver.vehicleType as keyof typeof VEHICLE_CAPACITIES] || 4;
+    const requestedCapacity = rawSeats > 0 ? Math.min(rawSeats, maxCapacity) : maxCapacity;
+    
+    // Warn if capacity exceeds vehicle limits
+    if (rawSeats > maxCapacity) {
+      console.warn(`Requested seats (${rawSeats}) exceeded ${latestDriver.vehicleType} capacity (${maxCapacity}). Using maximum capacity.`);
+      alert(`Note: ${latestDriver.vehicleType} maximum capacity is ${maxCapacity} seats. Using ${maxCapacity} seats.`);
+    }
+    
     const rate = isShuttle
       ? settings.shuttleCommission || settings.commissionPerSeat
       : settings.commissionPerSeat;
-    const commissionAmount = isShuttle ? capacity * rate : 0;
+    const commissionAmount = isShuttle ? requestedCapacity * rate : 0;
 
     if (isShuttle && latestDriver.walletBalance < commissionAmount) {
       alert(
-        `Insufficient Wallet Balance. Shuttle broadcasts require prepaid commission of ₵${commissionAmount.toFixed(2)}.`,
+        `Insufficient Wallet Balance. Shuttle broadcasts require prepaid commission of ₵${commissionAmount.toFixed(2)} for ${requestedCapacity} seats. Current balance: ₵${latestDriver.walletBalance.toFixed(2)}`,
       );
       return;
     }
@@ -5543,7 +5559,8 @@ const App: React.FC = () => {
       id: `NODE-DRV-${Date.now()}`,
       origin: data.origin,
       destination: data.destination,
-      capacityNeeded: capacity,
+      capacityNeeded: requestedCapacity,
+      maxCapacity: maxCapacity, // Store max capacity for reference
       passengers: [],
       status: "forming",
       leaderName: latestDriver.name,
@@ -5607,8 +5624,8 @@ const App: React.FC = () => {
 
       alert(
         isShuttle
-          ? `Route broadcasted! ₵${commissionAmount.toFixed(2)} commission prepaid.`
-          : "Route broadcasted to passengers!",
+          ? `Route broadcasted! ₵${commissionAmount.toFixed(2)} commission prepaid for ${requestedCapacity} seats.`
+          : `Route broadcasted! Capacity: ${requestedCapacity}/${maxCapacity} seats.`,
       );
     } catch (e: any) {
       console.error("Broadcast Logic Failure:", e);
