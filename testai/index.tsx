@@ -6068,7 +6068,10 @@ const App: React.FC = () => {
   };
 
   const handleDriverAuth = async (driverId: string, pin: string) => {
+  console.log('🔍 Driver Auth Started:', { driverId, pinLength: pin?.length });
+  
   if (!driverId || !pin) {
+    console.error('❌ Missing credentials:', { driverId, pin });
     alert("Driver ID and PIN are required.");
     return;
   }
@@ -6082,48 +6085,125 @@ const App: React.FC = () => {
       .catch(() => '127.0.0.1');
 
     const userAgent = navigator.userAgent;
+    console.log('🌐 Security info:', { userIP, userAgentLength: userAgent?.length });
 
     // Direct database query instead of RPC function
+    console.log('🔎 Querying driver with ID:', driverId);
     const { data: driver, error } = await supabase
       .from('unihub_drivers')
       .select('*')
       .eq('id', driverId)
       .single();
 
+    console.log('📊 Driver query result:', { driver, error });
+
     if (error) {
-      console.error('Driver query error:', error);
-      alert(`Login failed: Driver not found`);
+      console.error('❌ Driver query error:', error);
+      alert(`Login failed: ${error.message || 'Driver not found'}`);
       setIsSyncing(false);
       return;
     }
 
     if (!driver) {
+      console.error('❌ Driver not found in database');
       alert('Driver not found. Please check your credentials.');
+      setIsSyncing(false);
+      return;
+    }
+
+    console.log('✅ Driver found:', { 
+      id: driver.id, 
+      name: driver.name, 
+      status: driver.status,
+      hasPin: !!driver.pin,
+      lockedUntil: driver.locked_until,
+      failedAttempts: driver.failed_attempts
+    });
+
+    // Check if account is locked
+    if (driver.locked_until && new Date(driver.locked_until) > new Date()) {
+      const unlockTime = new Date(driver.locked_until).toLocaleString();
+      console.error('🔒 Account locked until:', unlockTime);
+      alert(`Account temporarily locked. Try again after ${unlockTime}`);
       setIsSyncing(false);
       return;
     }
 
     // Check PIN (plain text comparison as per existing logic)
     if (driver.pin !== pin) {
-      alert('Invalid PIN. Please try again.');
+      console.error('❌ PIN mismatch:', { 
+        enteredPin: pin, 
+        storedPin: driver.pin ? '[REDACTED]' : null,
+        pinLength: driver.pin?.length 
+      });
+      
+      // Update failed attempts and potentially lock account
+      const newFailedAttempts = (driver.failed_attempts || 0) + 1;
+      const shouldLock = newFailedAttempts >= 5;
+      const lockedUntil = shouldLock ? new Date(Date.now() + 15 * 60 * 1000) : null; // 15 minutes lock
+
+      console.log('📈 Updating failed attempts:', { newFailedAttempts, shouldLock });
+
+      await supabase
+        .from('unihub_drivers')
+        .update({
+          failed_attempts: newFailedAttempts,
+          locked_until: lockedUntil?.toISOString(),
+          last_login_attempt: new Date().toISOString()
+        })
+        .eq('id', driverId);
+
+      if (shouldLock) {
+        alert('Too many failed attempts. Account locked for 15 minutes.');
+      } else {
+        alert(`Invalid PIN. Attempts remaining: ${5 - newFailedAttempts}`);
+      }
       setIsSyncing(false);
       return;
     }
 
-    // Update driver status to online
+    console.log('🎉 PIN verified successfully');
+
+    // Successful login - reset failed attempts and update status
     const { error: updateError } = await supabase
       .from('unihub_drivers')
       .update({ 
         status: 'online',
-        last_login: new Date().toISOString()
+        last_login: new Date().toISOString(),
+        failed_attempts: 0,
+        locked_until: null
       })
       .eq('id', driverId);
 
     if (updateError) {
-      console.warn('Failed to update driver status:', updateError);
+      console.warn('⚠️ Failed to update driver status:', updateError);
+      // Continue anyway - login was successful
+    } else {
+      console.log('✅ Driver status updated to online');
+    }
+
+    // Log successful login attempt (optional)
+    try {
+      await supabase
+        .from('unihub_security_logs')
+        .insert({
+          user_phone: driver.contact,
+          attempt_type: 'driver_login',
+          status: 'success',
+          metadata: {
+            ip_address: userIP,
+            user_agent: userAgent,
+            driver_id: driverId
+          }
+        });
+      console.log('📝 Security log created');
+    } catch (logError) {
+      console.warn('⚠️ Failed to create security log:', logError);
       // Continue anyway - login was successful
     }
 
+    console.log('🚀 Login successful, setting active driver');
+    
     // Successful login
     setActiveDriverId(driverId);
     sessionStorage.setItem("nexryde_driver_session_v1", driverId);
@@ -6131,10 +6211,11 @@ const App: React.FC = () => {
     alert(`Welcome back, ${driver.name}!`);
     
   } catch (err: any) {
-    console.error('Driver auth error:', err);
+    console.error('💥 Driver auth error:', err);
     alert(`Authentication error: ${err.message}`);
   } finally {
     setIsSyncing(false);
+    console.log('🏁 Driver auth process completed');
   }
 };
 
