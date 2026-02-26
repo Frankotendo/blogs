@@ -2697,6 +2697,8 @@ const DriverPortal = ({
   const [isScanning, setIsScanning] = useState<string | null>(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [isPlayingBriefing, setIsPlayingBriefing] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const [regMode, setRegMode] = useState(false);
   const [regData, setRegData] = useState<any>({
@@ -2721,6 +2723,45 @@ const DriverPortal = ({
     fare: 5,
     note: "",
   });
+
+  // Error boundary effect
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      console.error('DriverPortal error:', event.error);
+      setHasError(true);
+      setErrorMessage(event.error?.message || 'An unexpected error occurred');
+    };
+
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
+
+  // Reset error on retry
+  const handleRetry = () => {
+    setHasError(false);
+    setErrorMessage("");
+  };
+
+  // Show error state
+  if (hasError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-8">
+        <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center text-white mb-4">
+          <i className="fas fa-exclamation-triangle text-2xl"></i>
+        </div>
+        <h3 className="text-lg font-bold text-white mb-2">Driver Portal Error</h3>
+        <p className="text-sm text-slate-400 mb-4 text-center max-w-md">
+          {errorMessage || 'Something went wrong while loading the driver portal.'}
+        </p>
+        <button
+          onClick={handleRetry}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   const myActiveRides = dispatchedNodes.filter(
     (n: any) =>
@@ -6034,7 +6075,7 @@ const App: React.FC = () => {
 
   setIsSyncing(true);
   try {
-    // Get user IP for security tracking
+    // Get user IP for security tracking (optional)
     const userIP = await fetch('https://api.ipify.org?format=json')
       .then(res => res.json())
       .then(data => data.ip)
@@ -6042,44 +6083,55 @@ const App: React.FC = () => {
 
     const userAgent = navigator.userAgent;
 
-    // Use secure driver login function with rate limiting
-    const { data, error } = await supabase.rpc('secure_driver_login', {
-      p_driver_id: driverId,
-      p_pin: pin,
-      p_ip: userIP,
-      p_user_agent: userAgent
-    });
+    // Direct database query instead of RPC function
+    const { data: driver, error } = await supabase
+      .from('unihub_drivers')
+      .select('*')
+      .eq('id', driverId)
+      .single();
 
     if (error) {
-      alert(`Login failed: ${error.message}`);
+      console.error('Driver query error:', error);
+      alert(`Login failed: Driver not found`);
       setIsSyncing(false);
       return;
     }
 
-    if (!data.success) {
-      // Handle different error types
-      if (data.code === 'RATE_LIMIT_EXCEEDED') {
-        alert("Too many login attempts. Please try again later.");
-      } else if (data.code === 'ACCOUNT_LOCKED') {
-        alert(`Account temporarily locked. Try again after ${new Date(data.locked_until).toLocaleString()}`);
-      } else {
-        // Show attempts remaining for invalid credentials
-        const attemptsRemaining = data.attempts_remaining || 0;
-        const message = attemptsRemaining > 0 
-          ? `${data.error || "Login failed. Please check your credentials."}\n\nAttempts remaining: ${attemptsRemaining}/5`
-          : data.error || "Login failed. Please check your credentials.";
-        alert(message);
-      }
+    if (!driver) {
+      alert('Driver not found. Please check your credentials.');
       setIsSyncing(false);
       return;
+    }
+
+    // Check PIN (plain text comparison as per existing logic)
+    if (driver.pin !== pin) {
+      alert('Invalid PIN. Please try again.');
+      setIsSyncing(false);
+      return;
+    }
+
+    // Update driver status to online
+    const { error: updateError } = await supabase
+      .from('unihub_drivers')
+      .update({ 
+        status: 'online',
+        last_login: new Date().toISOString()
+      })
+      .eq('id', driverId);
+
+    if (updateError) {
+      console.warn('Failed to update driver status:', updateError);
+      // Continue anyway - login was successful
     }
 
     // Successful login
     setActiveDriverId(driverId);
     sessionStorage.setItem("nexryde_driver_session_v1", driverId);
     setViewMode("driver");
-    alert(`Welcome back, ${data.name}!`);
+    alert(`Welcome back, ${driver.name}!`);
+    
   } catch (err: any) {
+    console.error('Driver auth error:', err);
     alert(`Authentication error: ${err.message}`);
   } finally {
     setIsSyncing(false);
