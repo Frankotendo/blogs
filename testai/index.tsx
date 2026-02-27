@@ -3356,6 +3356,55 @@ const DriverPortal = ({
                   </span>
                 </button>
 
+                {/* Route Display */}
+                <div className="bg-black/30 p-6 rounded-2xl border border-white/10">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">
+                    Route Navigation
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[10px] font-black">
+                        P
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-white">Pickup Location</p>
+                        <p className="text-xs text-slate-300">{node.origin}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center text-white text-[10px] font-black">
+                        D
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-white">Destination</p>
+                        <p className="text-xs text-slate-300">{node.destination}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(node.origin)}&destination=${encodeURIComponent(node.destination)}`;
+                        window.open(directionsUrl, '_blank');
+                      }}
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <i className="fas fa-directions"></i>
+                      Open in Google Maps
+                    </button>
+                    <div className="bg-black/50 rounded-lg p-4 border border-white/10">
+                      <iframe
+                        src={`https://www.google.com/maps/embed/v1/directions?key=AIzaSyBkAGv6c3c8aKqQoVqQhLjXZd3H8&origin=${encodeURIComponent(node.origin)}&destination=${encodeURIComponent(node.destination)}&avoid=tolls|highways`}
+                        width="100%"
+                        height="300"
+                        style={{ border: 0 }}
+                        allowFullScreen
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        className="rounded-lg"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex justify-center mb-6">
                   <button
                     onClick={() => setShowManualEntry(!showManualEntry)}
