@@ -1827,9 +1827,28 @@ const PassengerPortal = ({
             );
           })}
         </div>
-      )}
+      ) : (
+        <>
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i className="fas fa-route text-2xl text-slate-400"></i>
+          </div>
+          <h3 className="text-lg font-bold text-slate-600 mb-2">
+            No Active Trips
+          </h3>
+          <p className="text-sm text-slate-500 mb-6">
+            You haven't joined any rides yet. Browse available trips below and join one to get started!
+          </p>
+          <button
+            onClick={() => setCreateMode(true)}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+          >
+            <i className="fas fa-plus mr-2"></i>
+            Find Your First Trip
+          </button>
+        </div>
 
-      <div
+        <div
         onClick={() => setCreateMode(true)}
         className="glass p-8 rounded-[2.5rem] border-2 border-dashed border-white/10 hover:border-amber-500/50 cursor-pointer group transition-all text-center space-y-2"
       >
@@ -2023,6 +2042,7 @@ const PassengerPortal = ({
             Find Your First Trip
           </button>
         </div>
+        </>
       )}
     </div>
   );
