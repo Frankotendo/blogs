@@ -128,7 +128,7 @@ CREATE PUBLICATION supabase_realtime FOR TABLE unihub_drivers, driver_locations,
 CREATE OR REPLACE VIEW driver_passenger_tracking AS
 SELECT 
     n.id as node_id,
-    n.assignedDriverId as driver_id,
+    n."assignedDriverId" as driver_id,
     n.status as ride_status,
     n.passenger_latitude,
     n.passenger_longitude,
@@ -150,14 +150,14 @@ SELECT
         ELSE NULL
     END as distance_km
 FROM unihub_nodes n
-LEFT JOIN driver_locations dl ON n.assignedDriverId = dl.driver_id
+LEFT JOIN driver_locations dl ON n."assignedDriverId" = dl.driver_id
 LEFT JOIN passenger_locations pl ON (
     EXISTS (
         SELECT 1 FROM jsonb_array_elements(n.passengers) AS p
         WHERE p->>'id' = pl.passenger_id
     )
 )
-WHERE n.assignedDriverId IS NOT NULL 
+WHERE n."assignedDriverId" IS NOT NULL 
     AND n.status IN ('qualified', 'dispatched');
 
 -- 10. Test the setup

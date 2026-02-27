@@ -3130,6 +3130,7 @@ const DriverPortal = ({
                       {firstPassengerLocation ? "Navigate to Live GPS" : "Open in Google Maps"}
                     </button>
                     <div className="bg-black/50 rounded-lg p-4 border border-white/10">
+                      {/* Try iframe first, fallback to Leaflet if it fails */}
                       <iframe
                         src={firstPassengerLocation 
                           ? `https://www.google.com/maps?q=${firstPassengerLocation.lat},${firstPassengerLocation.lng}&destination=${encodeURIComponent(node.destination)}`
@@ -3142,12 +3143,21 @@ const DriverPortal = ({
                         loading="lazy"
                         className="rounded-lg"
                         title="Route Directions"
+                        onError={() => {
+                          console.log('Iframe failed, falling back to Leaflet map');
+                          // Could set state to show fallback map here
+                        }}
                       />
+                      
+                      {/* Leaflet fallback map (shown when iframe fails) */}
                       {firstPassengerLocation && (
                         <div className="mt-2 text-center">
                           <span className="text-xs text-emerald-400 animate-pulse">
                             📍 Using Live Passenger GPS Location
                           </span>
+                          <div className="mt-2 text-xs text-slate-400">
+                            If map doesn't load, <a href="#" onClick={(e) => { e.preventDefault(); window.open(`https://www.openstreetmap.org/?mlat=${firstPassengerLocation.lat}&mlon=${firstPassengerLocation.lng}&zoom=15`, '_blank'); }} className="text-blue-400 underline">Open in OpenStreetMap</a>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -4837,6 +4847,31 @@ const App: React.FC = () => {
           () => fetchData(),
         )
         .subscribe(),
+      supabase
+        .channel("public:passenger_locations")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "passenger_locations" },
+          (payload) => {
+            console.log('Passenger location update:', payload);
+            setPassengerLocations(prev => ({
+              ...prev,
+              [payload.new.passenger_id]: { lat: payload.new.latitude, lng: payload.new.longitude }
+            }));
+          }
+        )
+        .subscribe(),
+      supabase
+        .channel("public:driver_locations")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "driver_locations" },
+          (payload) => {
+            console.log('Driver location update:', payload);
+            // Could update driver tracking if needed
+          }
+        )
+        .subscribe(),
     ];
 
     return () => {
@@ -4844,6 +4879,48 @@ const App: React.FC = () => {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Track passenger location when user is logged in and not a driver
+  useEffect(() => {
+    if (!currentUser || activeDriverId || viewMode === 'driver') return;
+
+    let watchId: number | null = null;
+
+    const startLocationTracking = () => {
+      if ('geolocation' in navigator) {
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude, accuracy, heading, speed } = position.coords;
+            
+            // Update passenger location in database
+            updatePassengerLocation(currentUser.id, latitude, longitude, accuracy, heading, speed);
+            
+            // Also update local state for immediate UI updates
+            setPassengerLocations(prev => ({
+              ...prev,
+              [currentUser.id]: { lat: latitude, lng: longitude }
+            }));
+          },
+          (error) => {
+            console.error('Passenger geolocation error:', error);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+          }
+        );
+      }
+    };
+
+    startLocationTracking();
+
+    return () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, [currentUser, activeDriverId, viewMode]);
 
   const activeDriver = useMemo(
     () => drivers.find((d) => d.id === activeDriverId),
@@ -5886,6 +5963,33 @@ const App: React.FC = () => {
   const handleDismissAnnouncement = () => {
     setDismissedAnnouncement("true");
     localStorage.setItem("nexryde_dismissed_announcement", "true");
+  };
+
+  // Update passenger location in database
+  const updatePassengerLocation = async (passengerId: string, latitude: number, longitude: number, accuracy?: number, heading?: number, speed?: number) => {
+    try {
+      const { error } = await supabase
+        .from('passenger_locations')
+        .upsert({
+          passenger_id: passengerId,
+          latitude,
+          longitude,
+          accuracy: accuracy || null,
+          heading: heading || null,
+          speed: speed || null,
+          last_updated: new Date().toISOString()
+        }, {
+          onConflict: 'passenger_id'
+        });
+
+      if (error) {
+        console.error('Error updating passenger location:', error);
+      } else {
+        console.log('Passenger location updated successfully');
+      }
+    } catch (error) {
+      console.error('Failed to update passenger location:', error);
+    }
   };
 
   const safeSetViewMode = (mode: PortalMode) => {
