@@ -283,56 +283,95 @@ const QrScannerModal = ({
 }) => {
   const [currentCamera, setCurrentCamera] = useState<'back' | 'front'>('back');
   const [availableCameras, setAvailableCameras] = useState<any[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!(window as any).Html5QrcodeScanner) {
+    if (!(window as any).Html5Qrcode) {
       alert("Scanner library loading... try again.");
       onClose();
       return;
     }
 
-    const getCameras = async () => {
+    const startScanner = async () => {
       try {
+        // Get available cameras
         const devices = await (window as any).Html5Qrcode.getCameras();
         setAvailableCameras(devices);
+        
+        // Find the appropriate camera
+        let selectedCameraId = null;
+        if (devices.length > 0) {
+          const backCamera = devices.find((device: any) => 
+            device.label.toLowerCase().includes('back') || 
+            device.label.toLowerCase().includes('environment') ||
+            device.label.toLowerCase().includes('rear')
+          );
+          const frontCamera = devices.find((device: any) => 
+            device.label.toLowerCase().includes('front') || 
+            device.label.toLowerCase().includes('user')
+          );
+          
+          if (currentCamera === 'back' && backCamera) {
+            selectedCameraId = backCamera.id;
+          } else if (currentCamera === 'front' && frontCamera) {
+            selectedCameraId = frontCamera.id;
+          } else {
+            // Fallback to first available camera
+            selectedCameraId = devices[0].id;
+          }
+        }
+
+        // Clear previous scanner if exists
+        if (scannerRef.current) {
+          try {
+            await scannerRef.current.stop();
+          } catch (e) {
+            // Ignore stop errors
+          }
+        }
+
+        // Create new scanner instance
+        const html5QrCode = new (window as any).Html5Qrcode("reader");
+        scannerRef.current = html5QrCode;
+
+        // Start scanning with selected camera
+        await html5QrCode.start(
+          selectedCameraId,
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+          },
+          (decodedText: string) => {
+            html5QrCode.stop();
+            onScan(decodedText);
+          },
+          (errorMessage: any) => {
+            // Ignore scan errors
+          }
+        );
+
+        setIsScanning(true);
+        console.log('Scanner started with camera:', currentCamera, 'ID:', selectedCameraId);
+
       } catch (err) {
-        console.log('Camera enumeration failed:', err);
+        console.log('Scanner start failed:', err);
+        setIsScanning(false);
       }
     };
 
-    getCameras();
-
-    const config = {
-      fps: 10,
-      qrbox: { width: 250, height: 250 },
-      // Enhanced camera configuration with fallback
-      facingMode: currentCamera === 'back' ? 'environment' : 'user',
-      // Additional camera constraints for better performance
-      aspectRatio: 1.0,
-    };
-
-    const scanner = new (window as any).Html5QrcodeScanner(
-      "reader",
-      config,
-      false,
-    );
-
-    scanner.render(
-      (text: string) => {
-        scanner.clear();
-        onScan(text);
-      },
-      (err: any) => {
-        // ignore errors
-      },
-    );
+    startScanner();
 
     return () => {
-      try {
-        scanner.clear();
-      } catch (e) {}
+      if (scannerRef.current) {
+        try {
+          scannerRef.current.stop();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
     };
-  }, [currentCamera]);
+  }, [currentCamera, onScan]);
 
   return (
     <div className="fixed inset-0 bg-black/95 z-[1000] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
@@ -359,16 +398,24 @@ const QrScannerModal = ({
             {/* Camera Switch Button */}
             <button
               onClick={() => setCurrentCamera(currentCamera === 'back' ? 'front' : 'back')}
-              className="absolute top-3 right-3 z-10 w-10 h-10 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-colors group"
+              disabled={!isScanning}
+              className={`absolute top-3 right-3 z-10 w-10 h-10 backdrop-blur-md rounded-full flex items-center justify-center text-white transition-colors group ${
+                isScanning 
+                  ? 'bg-black/50 hover:bg-black/70' 
+                  : 'bg-black/30 cursor-not-allowed opacity-50'
+              }`}
               title={`Switch to ${currentCamera === 'back' ? 'front' : 'back'} camera`}
             >
-              <i className="fas fa-camera-rotate text-sm group-hover:rotate-180 transition-transform duration-300" />
+              <i className={`fas fa-camera-rotate text-sm ${isScanning ? 'group-hover:rotate-180 transition-transform duration-300' : ''}`} />
             </button>
             
             {/* Camera Type Indicator */}
             <div className="absolute top-3 left-3 z-10 px-2 py-1 bg-black/50 backdrop-blur-md rounded-full flex items-center gap-1 text-white text-[10px] font-medium">
               <i className={`fas ${currentCamera === 'back' ? 'fa-camera' : 'fa-mobile-screen'}`} />
               <span>{currentCamera === 'back' ? 'Back' : 'Front'}</span>
+              {!isScanning && (
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse ml-1" />
+              )}
             </div>
 
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
