@@ -3484,6 +3484,29 @@ const DriverPortal = ({
             <h3 className="text-4xl font-black text-white">
               ₵ {activeDriver.walletBalance.toFixed(2)}
             </h3>
+            
+            {/* Shuttle Active Trips Indicator */}
+            {isShuttle && myActiveRides.length > 0 && (
+              <div className="mt-4 p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                <p className="text-[9px] font-black text-emerald-400 uppercase mb-1">
+                  Active Routes
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <i className="fas fa-bus text-emerald-400"></i>
+                  <span className="text-lg font-black text-emerald-300">
+                    {myActiveRides.length}
+                  </span>
+                  <span className="text-[9px] text-emerald-400">
+                    {myActiveRides.length === 1 ? 'trip' : 'trips'}
+                  </span>
+                </div>
+                {myActiveRides.length > 1 && (
+                  <p className="text-[8px] text-emerald-500 mt-1">
+                    Discount applied
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="p-6 bg-white/5 rounded-[2rem] border border-white/5 space-y-4">
@@ -5175,21 +5198,46 @@ const App: React.FC = () => {
     const node = nodes.find((n) => n.id === nodeId);
     if (!latestDriver || !node) return;
 
-    const activeRide = nodes.find(
-      (n) => n.assignedDriverId === driverId && n.status !== "completed",
-    );
-    if (activeRide) {
-      alert(
-        "Please complete your current active ride or broadcast before accepting a new one.",
+    // Shuttle drivers can accept multiple trips - remove restriction for shuttles
+    const isShuttle = latestDriver.vehicleType === "Shuttle";
+    if (!isShuttle) {
+      const activeRide = nodes.find(
+        (n) => n.assignedDriverId === driverId && n.status !== "completed",
       );
-      return;
+      if (activeRide) {
+        alert(
+          "Please complete your current active ride or broadcast before accepting a new one.",
+        );
+        return;
+      }
     }
 
-    const totalCommission = settings.commissionPerSeat * node.passengers.length;
+    // Enhanced commission structure for shuttle drivers
+    let totalCommission: number;
+    let commissionMessage: string;
+    
+    if (isShuttle) {
+      // Shuttle drivers get discounted commission for multiple trips
+      const activeShuttleTrips = nodes.filter(
+        (n) => n.assignedDriverId === driverId && n.status !== "completed"
+      ).length;
+      
+      // Progressive discount: more trips = lower commission per seat
+      const discountMultiplier = Math.max(0.5, 1 - (activeShuttleTrips * 0.1)); // Min 50% of base rate
+      totalCommission = settings.commissionPerSeat * node.passengers.length * discountMultiplier;
+      
+      commissionMessage = activeShuttleTrips > 0 
+        ? `Shuttle discount applied (${(discountMultiplier * 100).toFixed(0)}% rate). Need ₵${totalCommission.toFixed(2)}`
+        : `Standard shuttle rate. Need ₵${totalCommission.toFixed(2)}`;
+    } else {
+      // Standard commission for other vehicle types
+      totalCommission = settings.commissionPerSeat * node.passengers.length;
+      commissionMessage = `Need ₵${totalCommission.toFixed(2)} to accept this ride.`;
+    }
 
     if (latestDriver.walletBalance < totalCommission) {
       alert(
-        `Insufficient Credits! You need at least ₵${totalCommission.toFixed(2)} to accept this ride.`,
+        `Insufficient Credits! ${commissionMessage}`,
       );
       return;
     }
@@ -5229,10 +5277,17 @@ const App: React.FC = () => {
         ]),
       ]);
 
+      // Enhanced success message for shuttle drivers
+      const activeShuttleTripsCount = isShuttle 
+        ? nodes.filter((n) => n.assignedDriverId === driverId && n.status !== "completed").length
+        : 0;
+      
       alert(
         customFare
           ? `Premium trip accepted at ₵${customFare}! Commission deducted.`
-          : "Ride accepted! Commission deducted. Codes synced.",
+          : isShuttle && activeShuttleTripsCount > 1
+            ? `Shuttle trip accepted! Now serving ${activeShuttleTripsCount} routes. Discounted commission applied.`
+            : "Ride accepted! Commission deducted. Codes synced.",
       );
     } catch (err: any) {
       console.error("Accept ride error:", err);
