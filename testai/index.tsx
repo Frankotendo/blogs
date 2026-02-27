@@ -9,6 +9,7 @@ import ReactDOM from "react-dom/client";
 import TrackingComponent from "./TrackingComponent";
 import SocialMediaMarketing from "./SocialMediaMarketing";
 import EnhancedDemandAI from "./EnhancedDemandAI";
+import { ForgotPasswordModal } from "./SecurityComponents";
 import {
   GoogleGenAI,
   Type,
@@ -5118,18 +5119,74 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
       if (mode === "login") {
+        // Get user IP for security tracking
+        const userIP = await fetch('https://api.ipify.org?format=json')
+          .then(res => res.json())
+          .then(data => data.ip)
+          .catch(() => '127.0.0.1');
+
+        const userAgent = navigator.userAgent;
+
+        // Check login attempts before proceeding
+        const { data: attemptCheck } = await supabase.rpc('check_login_attempts', {
+          p_identifier: phone,
+          p_attempt_type: 'user_login'
+        });
+
+        if (attemptCheck && attemptCheck[0]?.is_locked) {
+          const unlockTime = new Date(attemptCheck[0].locked_until).toLocaleString();
+          alert(`Account temporarily locked. Try again after ${unlockTime}`);
+          setIsSyncing(false);
+          return;
+        }
+
+        // Direct database query for authentication
         const { data: user, error } = await supabase
           .from("unihub_users")
           .select("*")
           .eq("phone", phone)
-          .eq("pin", pin)
           .single();
 
         if (error || !user) {
+          // Log failed attempt
+          await supabase.rpc('log_login_attempt', {
+            p_identifier: phone,
+            p_attempt_type: 'user_login',
+            p_status: 'failed',
+            p_ip_address: userIP,
+            p_user_agent: userAgent,
+            p_metadata: { error: 'User not found' }
+          });
           alert("Login failed. Please check your credentials.");
           setIsSyncing(false);
           return;
         }
+
+        // Check PIN
+        if (user.pin !== pin) {
+          // Log failed attempt
+          await supabase.rpc('log_login_attempt', {
+            p_identifier: phone,
+            p_attempt_type: 'user_login',
+            p_status: 'failed',
+            p_ip_address: userIP,
+            p_user_agent: userAgent,
+            p_metadata: { error: 'Invalid PIN' }
+          });
+          alert("Invalid PIN. Please try again.");
+          setIsSyncing(false);
+          return;
+        }
+
+        // Log successful login
+        await supabase.rpc('log_login_attempt', {
+          p_identifier: phone,
+          p_attempt_type: 'user_login',
+          p_status: 'success',
+          p_ip_address: userIP,
+          p_user_agent: userAgent,
+          p_metadata: { user_id: user.id }
+        });
 
         setCurrentUser(user as UniUser);
         localStorage.setItem("nexryde_user_v1", JSON.stringify(user));
@@ -6040,6 +6097,27 @@ const App: React.FC = () => {
 
     setIsSyncing(true);
     try {
+      // Get user IP for security tracking
+      const userIP = await fetch('https://api.ipify.org?format=json')
+        .then(res => res.json())
+        .then(data => data.ip)
+        .catch(() => '127.0.0.1');
+
+      const userAgent = navigator.userAgent;
+
+      // Check login attempts before proceeding
+      const { data: attemptCheck } = await supabase.rpc('check_login_attempts', {
+        p_identifier: driverId,
+        p_attempt_type: 'driver_login'
+      });
+
+      if (attemptCheck && attemptCheck[0]?.is_locked) {
+        const unlockTime = new Date(attemptCheck[0].locked_until).toLocaleString();
+        alert(`Account temporarily locked. Try again after ${unlockTime}`);
+        setIsSyncing(false);
+        return;
+      }
+
       const { data: driver, error } = await supabase
         .from("unihub_drivers")
         .select("*")
@@ -6047,6 +6125,15 @@ const App: React.FC = () => {
         .single();
 
       if (error || !driver) {
+        // Log failed attempt
+        await supabase.rpc('log_login_attempt', {
+          p_identifier: driverId,
+          p_attempt_type: 'driver_login',
+          p_status: 'failed',
+          p_ip_address: userIP,
+          p_user_agent: userAgent,
+          p_metadata: { error: 'Driver not found' }
+        });
         alert("Invalid credentials. Please try again.");
         setIsSyncing(false);
         return;
@@ -6054,6 +6141,15 @@ const App: React.FC = () => {
 
       // Check PIN
       if (driver.pin !== pin) {
+        // Log failed attempt
+        await supabase.rpc('log_login_attempt', {
+          p_identifier: driverId,
+          p_attempt_type: 'driver_login',
+          p_status: 'failed',
+          p_ip_address: userIP,
+          p_user_agent: userAgent,
+          p_metadata: { error: 'Invalid PIN' }
+        });
         alert("Invalid PIN. Please try again.");
         setIsSyncing(false);
         return;
@@ -6065,6 +6161,16 @@ const App: React.FC = () => {
         setIsSyncing(false);
         return;
       }
+
+      // Log successful login
+      await supabase.rpc('log_login_attempt', {
+        p_identifier: driverId,
+        p_attempt_type: 'driver_login',
+        p_status: 'success',
+        p_ip_address: userIP,
+        p_user_agent: userAgent,
+        p_metadata: { driver_id: driverId }
+      });
 
       setActiveDriverId(driverId);
       sessionStorage.setItem("nexryde_driver_session_v1", driverId);
@@ -6796,6 +6902,30 @@ const App: React.FC = () => {
                 </button>
               </div>
             </div>
+          )}
+
+          {showForgotPin && (
+            <ForgotPasswordModal
+              userType="user"
+              onBack={() => setShowForgotPin(false)}
+              onSuccess={() => {
+                setShowForgotPin(false);
+                alert("PIN reset successful! You can now login with your new PIN.");
+              }}
+              supabase={supabase}
+            />
+          )}
+
+          {showDriverForgotPin && (
+            <ForgotPasswordModal
+              userType="driver"
+              onBack={() => setShowDriverForgotPin(false)}
+              onSuccess={() => {
+                setShowDriverForgotPin(false);
+                alert("Driver PIN reset successful! You can now login with your new PIN.");
+              }}
+              supabase={supabase}
+            />
           )}
 
           {showQrModal && (
