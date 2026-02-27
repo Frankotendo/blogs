@@ -948,7 +948,7 @@ const GlobalVoiceOrb = ({
             </p>
 
             <div className="mt-8 grid grid-cols-2 gap-4 max-w-xs mx-auto text-[10px] text-slate-400 font-bold uppercase">
-              {mode === "public" && (
+              {mode === "public" && (<>
         
                   <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 text-emerald-400">
                     "Help me login"
@@ -957,8 +957,8 @@ const GlobalVoiceOrb = ({
                     "My phone is..."
                   </div>
         
-              )}
-              {mode === "passenger" && (
+              </>}
+              {mode === "passenger" && (<>
         
                   <div className="bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20 text-indigo-400">
                     "I want Waakye"
@@ -967,7 +967,7 @@ const GlobalVoiceOrb = ({
                     "Call Pragia"
                   </div>
         
-              )}
+              </>}
             </div>
           </div>
           <button
@@ -1563,7 +1563,7 @@ const PassengerPortal = ({
               Solo (Express)
               {!isSoloUnlocked && !newNode.isSolo && (
                 <i className="fas fa-lock text-[7px] sm:text-[8px] opacity-70"></i>
-              )}
+              </>}
             </button>
           </div>
 
@@ -1717,7 +1717,7 @@ const PassengerPortal = ({
                       <p className="text-[9px] font-black text-emerald-400 uppercase animate-pulse">
                         Driver En Route
                       </p>
-                    )}
+                    </>}
                   </div>
                 </div>
 
@@ -1765,7 +1765,7 @@ const PassengerPortal = ({
                       </a>
                     </div>
                   </div>
-                )}
+                </>}
 
                 {node.assignedDriverId && myPin && (
                   <div className="bg-black/30 p-4 rounded-xl mb-4 flex items-center justify-between gap-4">
@@ -1794,7 +1794,7 @@ const PassengerPortal = ({
                       />
                     </div>
                   </div>
-                )}
+                </>}
 
                 <div className="flex gap-2">
                   {node.status === "forming" &&
@@ -1806,7 +1806,7 @@ const PassengerPortal = ({
                       >
                         Go Now (Pay Extra)
                       </button>
-                    )}
+                    </>}
                   <button
                     onClick={() => onLeave(node.id, currentUser.phone)}
                     className="flex-1 py-3 bg-white/5 hover:bg-rose-500/20 hover:text-rose-500 text-slate-400 rounded-xl font-black text-[9px] uppercase transition-all"
@@ -1821,7 +1821,7 @@ const PassengerPortal = ({
                       >
                         <i className="fas fa-trash text-xs"></i>
                       </button>
-                    )}
+                    </>}
                 </div>
               </div>
             );
@@ -1897,7 +1897,7 @@ const PassengerPortal = ({
                           <span className="px-2 py-1 bg-emerald-500 rounded-md text-[8px] font-black uppercase text-[#020617] animate-pulse">
                             Partner Offer
                           </span>
-                        )}
+                        </>}
                       </div>
                       <h4 className="text-base font-black text-white mt-1">
                         {node.destination}
@@ -1909,7 +1909,7 @@ const PassengerPortal = ({
                         <p className="text-[9px] text-emerald-400 font-bold mt-1">
                           "{node.driverNote}"
                         </p>
-                      )}
+                      </>}
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-black text-amber-500">
@@ -1958,7 +1958,7 @@ const PassengerPortal = ({
                           ></div>
                         ))}
               
-                    )}
+                    </>}
                   </div>
                   <button
                     onClick={() =>
@@ -1971,7 +1971,7 @@ const PassengerPortal = ({
                 </div>
                 {(index + 1) % 3 === 0 && (
                   <InlineAd className="col-span-1" settings={settings} />
-                )}
+                </>}
               </React.Fragment>
             );
           })}
@@ -2647,7 +2647,7 @@ const DriverPortal = ({
                   />
                 ) : (
                   <i className="fas fa-camera text-slate-400"></i>
-                )}
+                </>}
                 <input
                   type="file"
                   accept="image/*"
@@ -2854,7 +2854,7 @@ const DriverPortal = ({
               {tab}
               {tab === "active" && myActiveRides.length > 0 && (
                 <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span>
-              )}
+              </>}
             </button>
           ))}
         </div>
@@ -2915,12 +2915,12 @@ const DriverPortal = ({
                             >
                               Station Here
                             </button>
-                          )}
+                          </>}
                           {joined && (
                             <span className="px-3 py-1 bg-[#020617]/20 rounded-lg text-[9px] font-black uppercase">
                               Stationed
                             </span>
-                          )}
+                          </>}
                         </div>
                       </div>
                     </div>
@@ -2939,7 +2939,7 @@ const DriverPortal = ({
                 <p className="col-span-full text-center text-slate-600 py-8 text-xs font-bold uppercase">
                   No matching jobs.
                 </p>
-              )}
+              </>}
               {availableRides.map((node: any) => {
                 const isSolo = node.isSolo;
                 const paxCount = node.passengers.length;
@@ -2964,7 +2964,7 @@ const DriverPortal = ({
                       <div className="absolute top-4 right-4 text-[9px] font-black uppercase bg-amber-500 text-[#020617] px-2 py-1 rounded-md animate-pulse">
                         Express
                       </div>
-                    )}
+                    </>}
                     <div className="mb-4">
                       <h4 className="text-lg font-black text-white">
                         {node.destination}
@@ -2986,7 +2986,7 @@ const DriverPortal = ({
                           </p>
                           {isHighFare && (
                             <i className="fas fa-fire text-amber-500 text-xs animate-bounce"></i>
-                          )}
+                          </>}
                         </div>
                       </div>
                       <div className="text-right">
@@ -3057,7 +3057,7 @@ const DriverPortal = ({
                       <p className="text-xs text-emerald-400 mt-1">
                         📍 Live GPS: {firstPassengerLocation.lat.toFixed(4)}, {firstPassengerLocation.lng.toFixed(4)}
                       </p>
-                    )}
+                    </>}
                   </div>
                   <div className="text-right">
                     <p className="text-3xl font-black text-white">
@@ -3233,7 +3233,7 @@ const DriverPortal = ({
                             📍 Using Live Passenger GPS Location
                           </span>
                         </div>
-                      )}
+                      </>}
                     </div>
                   </div>
                 </div>
@@ -3266,7 +3266,7 @@ const DriverPortal = ({
                       Verify
                     </button>
                   </div>
-                )}
+                </>}
 
                 <div className="text-center">
                   <button
@@ -3297,7 +3297,7 @@ const DriverPortal = ({
                 <span className="px-2 py-1 bg-amber-500 text-[#020617] text-[8px] font-black uppercase rounded">
                   Bus Mode
                 </span>
-              )}
+              </>}
             </div>
             <div className="space-y-4">
               <input
@@ -3372,7 +3372,7 @@ const DriverPortal = ({
                         </option>
                       ))}
                     </select>
-                  )}
+                  </>}
                 </div>
               </div>
               <input
@@ -3395,7 +3395,7 @@ const DriverPortal = ({
                     deducted <b>immediately</b> upon broadcast to reserve slots.
                   </p>
                 </div>
-              )}
+              </>}
 
               <button
                 onClick={() => onBroadcast(broadcastData)}
@@ -3450,7 +3450,7 @@ const DriverPortal = ({
                       <p className="text-[10px] text-slate-600 italic">
                         Waiting for passengers...
                       </p>
-                    )}
+                    </>}
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -3757,7 +3757,7 @@ const AdminPortal = ({
                   />
                 ) : (
                   <i className="fas fa-camera text-slate-400"></i>
-                )}
+                </>}
                 <input
                   type="file"
                   accept="image/*"
@@ -4161,7 +4161,7 @@ const AdminPortal = ({
                   src={localSettings.appLogo}
                   className="w-12 h-12 object-contain bg-white/10 rounded-lg"
                 />
-              )}
+              </>}
               <input
                 type="file"
                 accept="image/*"
@@ -4181,7 +4181,7 @@ const AdminPortal = ({
                   src={localSettings.appWallpaper}
                   className="w-16 h-9 object-cover bg-white/10 rounded-lg border border-white/10"
                 />
-              )}
+              </>}
               <input
                 type="file"
                 accept="image/*"
@@ -4197,7 +4197,7 @@ const AdminPortal = ({
                 >
                   Clear
                 </button>
-              )}
+              </>}
             </div>
           </div>
 
@@ -4562,7 +4562,7 @@ const AdminPortal = ({
                       Settle
                     </button>
           
-                )}
+                </>}
               </div>
             </div>
           ))}
@@ -6191,7 +6191,7 @@ const App: React.FC = () => {
                   <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-xl">
                     <i className="fas fa-route text-[#020617] text-xl"></i>
                   </div>
-                )}
+                </>}
                 <div>
                   <h1 className="text-2xl font-black tracking-tighter uppercase italic leading-none text-white">
                     NexRyde
@@ -6256,7 +6256,7 @@ const App: React.FC = () => {
                   }}
                   badge={pendingRequestsCount > 0 ? pendingRequestsCount : undefined}
                 />
-              )}
+              </>}
               <NavItem
                 active={viewMode === "tracking"}
                 icon="fa-location-dot"
@@ -6295,7 +6295,7 @@ const App: React.FC = () => {
                       <div className="w-10 h-10 bg-indigo-500/20 rounded-full flex items-center justify-center text-indigo-400">
                         <i className="fas fa-user text-xs"></i>
                       </div>
-                    )}
+                    </>}
                     <div className="truncate">
                       <p className="text-[9px] font-black uppercase text-indigo-400 leading-none">
                         Partner
@@ -6324,7 +6324,7 @@ const App: React.FC = () => {
                     {currentUser.phone}
                   </p>
                 </div>
-              )}
+              </>}
               <div className="bg-emerald-500/10 p-6 rounded-[2.5rem] border border-emerald-500/20 relative overflow-hidden">
                 <p className="text-[9px] font-black uppercase text-emerald-400 mb-2 flex items-center gap-2">
                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
@@ -6427,7 +6427,7 @@ const App: React.FC = () => {
                   </div>
                   <i className="fas fa-route absolute right-[-20px] top-[-20px] text-[150px] opacity-10 pointer-events-none rotate-12"></i>
                 </div>
-              )}
+              </>}
 
               {(viewMode === "passenger" ||
                 viewMode === "driver" ||
@@ -6437,7 +6437,7 @@ const App: React.FC = () => {
                   setSearchConfig={setSearchConfig}
                   portalMode={viewMode}
                 />
-              )}
+              </>}
 
               {viewMode === "passenger" && (
                 <PassengerPortal
@@ -6471,7 +6471,7 @@ const App: React.FC = () => {
                   setNewNode={setNewNode}
                   onTriggerVoice={() => triggerVoiceRef.current?.()}
                 />
-              )}
+              </>}
               {viewMode === "driver" && (
                 <DriverPortal
                   drivers={drivers}
@@ -6481,7 +6481,7 @@ const App: React.FC = () => {
                   qualifiedNodes={nodes.filter((n) => n.status === "qualified")}
                   dispatchedNodes={nodes.filter(
                     (n) => n.assignedDriverId === activeDriver?.id && n.status !== "completed"
-                  )}
+                  </>}
                   missions={missions}
                   allNodes={nodes}
                   onJoinMission={joinMission}
@@ -6507,7 +6507,7 @@ const App: React.FC = () => {
                   showDriverForgotPin={showDriverForgotPin}
                   setShowDriverForgotPin={setShowDriverForgotPin}
                 />
-              )}
+              </>}
               {viewMode === "admin" &&
                 (!isAdminAuthenticated ? (
           
@@ -6605,7 +6605,7 @@ const App: React.FC = () => {
                     <div className="w-14 h-14 bg-gradient-to-tr from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0">
                       <i className="fas fa-user-circle text-2xl"></i>
                     </div>
-                  )}
+                  </>}
                   <div className="min-w-0">
                     <h3 className="text-xl font-black text-white italic uppercase truncate">
                       {currentUser?.username || "Guest"}
@@ -6664,7 +6664,7 @@ const App: React.FC = () => {
                 <div className="space-y-2 flex flex-col items-center">
                   {settings.appLogo && (
                     <img src={settings.appLogo} alt="Logo" className="w-14 h-14 object-contain rounded-xl mb-2" />
-                  )}
+                  </>}
                   <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white leading-none">
                     NexRyde Code
                   </h3>
@@ -6704,7 +6704,7 @@ const App: React.FC = () => {
                   <div className="flex items-center gap-3 min-w-0">
                     {settings.appLogo && (
                       <img src={settings.appLogo} alt="Logo" className="w-10 h-10 object-contain rounded-xl shrink-0" />
-                    )}
+                    </>}
                     <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white">
                       NexRyde Guide
                     </h3>
@@ -6790,7 +6790,7 @@ const App: React.FC = () => {
                       <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shrink-0">
                         <i className="fas fa-info-circle text-xl"></i>
                       </div>
-                    )}
+                    </>}
                     <div>
                       <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white leading-none">
                         NexRyde Manifesto
@@ -6823,7 +6823,7 @@ const App: React.FC = () => {
                         </div>
                       ))}
                     </div>
-                  )}
+                  </>}
                 <div className="space-y-6">
                   <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/10 relative overflow-hidden">
                     <i className="fas fa-quote-left absolute top-4 left-4 text-4xl text-emerald-500/10"></i>
@@ -6862,7 +6862,7 @@ const App: React.FC = () => {
                           Facebook
                         </span>
                       </a>
-                    )}
+                    </>}
                     {settings.instagramUrl && (
                       <a
                         href={settings.instagramUrl}
@@ -6874,7 +6874,7 @@ const App: React.FC = () => {
                           Instagram
                         </span>
                       </a>
-                    )}
+                    </>}
                     {settings.tiktokUrl && (
                       <a
                         href={settings.tiktokUrl}
@@ -6886,7 +6886,7 @@ const App: React.FC = () => {
                           TikTok
                         </span>
                       </a>
-                    )}
+                    </>}
                   </div>
                 </div>
                 <div className="pt-6 border-t border-white/5 text-center space-y-4">
