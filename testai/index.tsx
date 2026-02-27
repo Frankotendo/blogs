@@ -949,24 +949,24 @@ const GlobalVoiceOrb = ({
 
             <div className="mt-8 grid grid-cols-2 gap-4 max-w-xs mx-auto text-[10px] text-slate-400 font-bold uppercase">
               {mode === "public" && (
-                <>
+        
                   <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 text-emerald-400">
                     "Help me login"
                   </div>
                   <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 text-emerald-400">
                     "My phone is..."
                   </div>
-                </>
+        
               )}
               {mode === "passenger" && (
-                <>
+        
                   <div className="bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20 text-indigo-400">
                     "I want Waakye"
                   </div>
                   <div className="bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20 text-indigo-400">
                     "Call Pragia"
                   </div>
-                </>
+        
               )}
             </div>
           </div>
@@ -1672,7 +1672,6 @@ const PassengerPortal = ({
   return (
     <div className="space-y-8">
       {myRides.length > 0 ? (
-        <>
         <div className="space-y-4">
           <h3 className="text-xs font-black uppercase text-slate-500 tracking-widest px-2">
             My Active Trips
@@ -1828,9 +1827,8 @@ const PassengerPortal = ({
             );
           })}
         </div>
-        </>
       ) : (
-        <>
+
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <i className="fas fa-route text-2xl text-slate-400"></i>
@@ -1943,7 +1941,7 @@ const PassengerPortal = ({
                         </div>
                       </div>
                     ) : (
-                      <>
+              
                         {node.passengers.map((p, i) => (
                           <div
                             key={i}
@@ -1959,7 +1957,7 @@ const PassengerPortal = ({
                             className="w-6 h-6 rounded-full bg-white/5 border border-white/10 border-dashed"
                           ></div>
                         ))}
-                      </>
+              
                     )}
                   </div>
                   <button
@@ -2025,7 +2023,7 @@ const PassengerPortal = ({
             </p>
           </div>
       ) : (
-        <>
+
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <i className="fas fa-route text-2xl text-slate-400"></i>
@@ -2044,9 +2042,8 @@ const PassengerPortal = ({
             Find Your First Trip
           </button>
         </div>
-        </>
+
       )}
-      </div>
     </div>
   );
 };
@@ -4551,7 +4548,7 @@ const AdminPortal = ({
               </div>
               <div className="flex gap-2 mt-2">
                 {n.status !== "completed" && (
-                  <>
+          
                     <button
                       onClick={() => onCancelRide(n.id)}
                       className="flex-1 py-2 bg-rose-500/10 text-rose-500 rounded-lg text-[9px] font-black uppercase hover:bg-rose-500 hover:text-white transition-all"
@@ -4564,7 +4561,7 @@ const AdminPortal = ({
                     >
                       Settle
                     </button>
-                  </>
+          
                 )}
               </div>
             </div>
@@ -6152,7 +6149,7 @@ const App: React.FC = () => {
           onTriggerVoice={() => triggerVoiceRef.current?.()}
         />
       ) : (
-        <>
+
           {settings.hub_announcement && !dismissedAnnouncement && (
             <div className={`fixed left-0 right-0 z-[2000] bg-gradient-to-r from-amber-600 to-rose-600 px-4 py-3 flex items-start sm:items-center justify-between shadow-2xl animate-in slide-in-from-top duration-500 border-b border-white/10 ${showInstallBanner ? "top-14" : "top-0"}`}>
               <div className="flex items-start sm:items-center gap-3 flex-1">
@@ -6513,11 +6510,11 @@ const App: React.FC = () => {
               )}
               {viewMode === "admin" &&
                 (!isAdminAuthenticated ? (
-                  <>
+          
                     <AdminLogin 
                       onLogin={handleAdminAuth} 
                     />
-                  </>
+          
                 ) : (
                   <AdminPortal
                     activeTab={activeTab}
@@ -6904,7 +6901,7 @@ const App: React.FC = () => {
               </div>
             </div>
           )}
-        </>
+
       )}
     </div>
   );
