@@ -1671,7 +1671,7 @@ const PassengerPortal = ({
 
   return (
     <div className="space-y-8">
-      {myRides.length > 0 && (
+      {myRides.length > 0 ? (
         <div className="space-y-4">
           <h3 className="text-xs font-black uppercase text-slate-500 tracking-widest px-2">
             My Active Trips
@@ -2003,6 +2003,25 @@ const PassengerPortal = ({
               Only show when ready to board
             </p>
           </div>
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i className="fas fa-route text-2xl text-slate-400"></i>
+          </div>
+          <h3 className="text-lg font-bold text-slate-600 mb-2">
+            No Active Trips
+          </h3>
+          <p className="text-sm text-slate-500 mb-6">
+            You haven't joined any rides yet. Browse available trips below and join one to get started!
+          </p>
+          <button
+            onClick={() => setCreateMode(true)}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+          >
+            <i className="fas fa-plus mr-2"></i>
+            Find Your First Trip
+          </button>
         </div>
       )}
     </div>
@@ -3129,31 +3148,64 @@ const DriverPortal = ({
                       {firstPassengerLocation ? "Navigate to Live GPS" : "Open in Google Maps"}
                     </button>
                     <div className="bg-black/50 rounded-lg p-4 border border-white/10">
-                      <div className="bg-slate-800 rounded-lg h-[300px] flex flex-col items-center justify-center relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-green-900/20"></div>
-                        <i className="fas fa-map-marked-alt text-4xl text-blue-400 mb-4 relative z-10"></i>
-                        <p className="text-white text-sm font-bold mb-2 relative z-10">
-                          {firstPassengerLocation ? "Live GPS Route Available" : "Route Preview"}
-                        </p>
-                        <p className="text-slate-400 text-xs text-center px-4 relative z-10">
-                          {firstPassengerLocation 
-                            ? `From GPS: ${firstPassengerLocation.lat.toFixed(4)}, ${firstPassengerLocation.lng.toFixed(4)}`
-                            : `From: ${node.origin} To: ${node.destination}`
-                          }
-                        </p>
-                        <button
-                          onClick={() => {
-                            const origin = firstPassengerLocation 
-                              ? `${firstPassengerLocation.lat},${firstPassengerLocation.lng}`
-                              : node.origin;
-                            const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(node.destination)}`;
-                            window.open(directionsUrl, '_blank');
-                          }}
-                          className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 relative z-10"
-                        >
-                          <i className="fas fa-external-link-alt"></i>
-                          Open in Google Maps
-                        </button>
+                      <div className="bg-white rounded-lg h-[300px] relative overflow-hidden">
+                        {/* Browser-like header */}
+                        <div className="bg-gray-100 border-b border-gray-300 px-3 py-2 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <i className="fas fa-map text-blue-600"></i>
+                            <span className="text-sm font-medium text-gray-700">Google Maps</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button className="text-gray-500 hover:text-gray-700">
+                              <i className="fas fa-search text-sm"></i>
+                            </button>
+                            <button className="text-gray-500 hover:text-gray-700">
+                              <i className="fas fa-ellipsis-v text-sm"></i>
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Map content area */}
+                        <div className="h-[250px] bg-gradient-to-br from-blue-50 via-green-50 to-blue-100 relative">
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="text-center">
+                              <i className="fas fa-map-marked-alt text-4xl text-blue-600 mb-3"></i>
+                              <p className="text-lg font-bold text-gray-800 mb-2">
+                                {firstPassengerLocation ? "Live GPS Route" : "Route Preview"}
+                              </p>
+                              <p className="text-sm text-gray-600 mb-4">
+                                {firstPassengerLocation 
+                                  ? `📍 GPS: ${firstPassengerLocation.lat.toFixed(4)}, ${firstPassengerLocation.lng.toFixed(4)}`
+                                  : `🚗 From: ${node.origin}`
+                                }
+                              </p>
+                              <p className="text-sm text-gray-600 mb-4">
+                                🎯 To: {node.destination}
+                              </p>
+                              <button
+                                onClick={() => {
+                                  const origin = firstPassengerLocation 
+                                    ? `${firstPassengerLocation.lat},${firstPassengerLocation.lng}`
+                                    : node.origin;
+                                  const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(node.destination)}`;
+                                  window.open(directionsUrl, '_blank');
+                                }}
+                                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 mx-auto"
+                              >
+                                <i className="fas fa-directions"></i>
+                                Navigate in Google Maps
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Browser-like footer */}
+                        <div className="bg-gray-100 border-t border-gray-300 px-3 py-1">
+                          <div className="flex items-center justify-between text-xs text-gray-600">
+                            <span>maps.google.com</span>
+                            <span>{firstPassengerLocation ? "GPS Navigation" : "Route Planning"}</span>
+                          </div>
+                        </div>
                       </div>
                       {firstPassengerLocation && (
                         <div className="mt-2 text-center">
