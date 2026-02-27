@@ -9,6 +9,7 @@ import ReactDOM from "react-dom/client";
 import TrackingComponent from "./TrackingComponent";
 import SocialMediaMarketing from "./SocialMediaMarketing";
 import EnhancedDemandAI from "./EnhancedDemandAI";
+import SmartLandingDashboard from "./SmartLandingDashboard";
 import {
   GoogleGenAI,
   Type,
@@ -4492,6 +4493,7 @@ const AdminPortal = ({
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<PortalMode>("passenger");
   const [activeTab, setActiveTab] = useState("monitor");
+  const [showLandingDashboard, setShowLandingDashboard] = useState(true);
 
   const [session, setSession] = useState<any>(null);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -4918,7 +4920,8 @@ const App: React.FC = () => {
 // Successful login
         setCurrentUser(user);
         sessionStorage.setItem("nexryde_user_session_v1", user.id);
-        setViewMode("user");
+        setViewMode("passenger");
+        setShowLandingDashboard(true);
         alert(`Welcome back, ${user.username || user.name}!`);
       } else {
         // Signup mode - check if user exists first
@@ -4955,6 +4958,8 @@ const App: React.FC = () => {
 
         setCurrentUser(newUser as UniUser);
         localStorage.setItem("nexryde_user_v1", JSON.stringify(newUser));
+        setViewMode("passenger");
+        setShowLandingDashboard(true);
         alert("Account created successfully!");
       }
     } catch (err: any) {
@@ -5857,6 +5862,7 @@ const App: React.FC = () => {
       setActiveDriverId(driverId);
       sessionStorage.setItem("nexryde_driver_session_v1", driverId);
       setViewMode("driver");
+      setShowLandingDashboard(false);
       alert(`Welcome back, ${driver.name}!`);
     } catch (error) {
       console.error("Driver auth error:", error);
@@ -5890,7 +5896,13 @@ const App: React.FC = () => {
         return;
       }
     }
+    setShowLandingDashboard(false);
     setViewMode(mode);
+  };
+
+  const handleNavigateFromDashboard = (portal: 'passenger' | 'driver' | 'admin' | 'tracking') => {
+    setShowLandingDashboard(false);
+    safeSetViewMode(portal);
   };
 
   const handleAiAccess = () => {
@@ -6342,6 +6354,22 @@ const App: React.FC = () => {
                   </div>
                   <i className="fas fa-route absolute right-[-20px] top-[-20px] text-[150px] opacity-10 pointer-events-none rotate-12"></i>
                 </div>
+              )}
+
+              {/* Smart Landing Dashboard - Shows on initial login */}
+              {showLandingDashboard && currentUser && (
+                <SmartLandingDashboard
+                  currentUser={currentUser}
+                  activeDriver={activeDriver}
+                  myRideIds={myRideIds}
+                  onNavigateToPortal={handleNavigateFromDashboard}
+                  onCreateRide={() => {
+                    setShowLandingDashboard(false);
+                    setCreateMode(true);
+                  }}
+                  onShowHelp={() => setShowHelpModal(true)}
+                  settings={settings}
+                />
               )}
 
               {(viewMode === "passenger" ||
