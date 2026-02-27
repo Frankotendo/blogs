@@ -2046,6 +2046,7 @@ const PassengerPortal = ({
         </div>
         </>
       )}
+      </div>
     </div>
   );
 };
