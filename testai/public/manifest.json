@@ -1,0 +1,27 @@
+{
+  "name": "NexRyde",
+  "short_name": "NexRyde",
+  "description": "Next-Gen Logistics",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#f59e0b",
+  "background_color": "#020617",
+  "icons": [
+    {
+      "src": "/NexRyde192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/NexRyde152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "/NexRyde.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

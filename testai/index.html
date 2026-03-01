@@ -1,0 +1,152 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NexRyde | Next-Gen Logistics</title>
+    
+    <!-- PWA & Mobile Optimization -->
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" href="/NexRyde.png">
+     <link rel="icon" href="/NexRyde192.png">
+     <link rel="icon" href="/NexRyde152.png">
+    <meta name="theme-color" content="#f59e0b">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://api.dicebear.com/7.x/shapes/svg?seed=nexryde&backgroundColor=f59e0b">
+
+    <!-- Google AdSense - Error handling for blocked ads -->
+    <script>
+      window.addEventListener('load', function() {
+        const script = document.createElement('script');
+        script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7812709042449387';
+        script.crossOrigin = 'anonymous';
+        script.async = true;
+        script.onerror = function() {
+          console.warn('AdSense blocked by browser or ad blocker - ads will not display');
+          window.adSenseBlocked = true;
+        };
+        document.head.appendChild(script);
+      });
+    </script>
+    <!-- Tailwind CSS - Local build for production -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Warning: Using CDN in development. Install locally for production.
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        console.warn('Using Tailwind CSS CDN in production. Run "npm install" and build locally.');
+      }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./storage_error_handler.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020617;
+            color: #f8fafc;
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+        .glass {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .glass-bright {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #020617;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 10px;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Scanner UI Tweaks */
+        #qr-reader {
+          border: none !important;
+          border-radius: 2rem;
+          overflow: hidden;
+        }
+        #qr-reader__scan_region {
+          background: #020617 !important;
+        }
+        #qr-reader__dashboard {
+          padding: 20px !important;
+        }
+        #qr-reader__dashboard_section_csr button {
+          background-color: #4f46e5 !important;
+          color: white !important;
+          border-radius: 0.75rem !important;
+          padding: 8px 16px !important;
+          font-weight: 800 !important;
+          text-transform: uppercase !important;
+          font-size: 10px !important;
+        }
+
+        @keyframes scan {
+          0% { top: 0; }
+          100% { top: 100%; }
+        }
+        .scanner-line {
+          height: 2px;
+          background: #10b981;
+          position: absolute;
+          width: 100%;
+          animation: scan 2s linear infinite;
+          box-shadow: 0 0 15px #10b981;
+          z-index: 20;
+          left: 0;
+        }
+        
+        /* GPS Tracking Styles */
+        #tracking-map {
+          height: 100vh;
+          width: 100%;
+        }
+        .driver-marker {
+          background: transparent;
+          border: none;
+          font-size: 24px;
+          text-align: center;
+          line-height: 30px;
+        }
+        .passenger-marker {
+          background: transparent;
+          border: none;
+          font-size: 24px;
+          text-align: center;
+          line-height: 30px;
+        }
+    </style>
+<!-- Inline styles only; no index.css to avoid 404/MIME issues when missing -->
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => {
+                    console.warn('SW registration failed:', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
